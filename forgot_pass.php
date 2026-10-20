@@ -23,7 +23,7 @@
       <div class="row justify-content-sm-center">
         <div class="col-sm-4">
           <h1>Account Recovery</h1>
-          <form action="./db/recovery.php" method="post">
+          <form action="./php/recovery.php" method="post">
             <div class="input-group mb-3">
               <input type="email" class="form-control" id="email" aria-describedby="email" placeholder="Enter Email" name="email" required>
             </div>

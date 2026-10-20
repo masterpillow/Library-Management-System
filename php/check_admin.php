@@ -19,6 +19,8 @@ if($user_role == 1){
   $_SESSION['message'] = "Access Denied";
   // Redirect to logout
   header("location: " . SRC_PATH . "/logout.php");
+  // Stop here, or the rest of the protected page still runs and is sent
+  exit();
 }
 
 ?>

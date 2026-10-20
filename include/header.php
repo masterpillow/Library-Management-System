@@ -25,7 +25,7 @@ if (!isset($_SESSION)) {
 <nav class="navbar navbar-expand-lg bg-body-tertiary">
   <div class="container-fluid">
     <a class="navbar-brand" href="../">   
-    <i class="bi bi-claude"></i>  Basic Login</a>
+    <i class="bi bi-book"></i>  Library Management System</a>
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarText" aria-controls="navbarText" aria-expanded="false" aria-label="Toggle navigation">
       <span class="navbar-toggler-icon"></span>
     </button>

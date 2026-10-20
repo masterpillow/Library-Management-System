@@ -23,8 +23,7 @@ ini_set('display_errors', 1); // set to 1 to display errors, 0 to hide them
 DEFINE('DB_HOST', "localhost");
 DEFINE('DB_USER', "root");
 DEFINE('DB_PASSWORD', ""); //Note: this should be your root password
-DEFINE('DB_NAME', "login_db");
-DEFINE('SALT', "authentication");
+DEFINE('DB_NAME', "library_db");
 
 try {
   $db_connection = new mysqli(DB_HOST, DB_USER, DB_PASSWORD, DB_NAME)

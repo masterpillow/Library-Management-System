@@ -6,9 +6,6 @@
 include_once (realpath(dirname(__FILE__).'/path.php'));
 include_once (realpath(dirname(__FILE__).'/config.php'));
 
-/* Salt used for seasoning */
-$salt = 'authentication';
-
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     // collect value of input field
     $first_name = $_POST['first_name'];
@@ -56,6 +53,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $insert_contact->close();
 
         // Insert into Users table with default role_id = 2 (user)
+        // membership_id defaults to 1 (Standard) in the database
         $role_id = 2; // Default role_id for regular users
         $insert_user = $db_connection->prepare("INSERT INTO Users (contact_id, role_id) VALUES (?, ?)");
         $insert_user->bind_param("ii", $contact_id, $role_id);
@@ -66,10 +64,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $insert_user->close();
 
             // Insert into Credentials table with hashed password
-            //$hashed_password = password_hash($password, PASSWORD_DEFAULT);
-            $password_salted = crypt($password, $salt);
-            $insert_credential = $db_connection->prepare("INSERT INTO Credentials (user_id, username, password_salted) VALUES (?, ?, ?)");
-            $insert_credential->bind_param("iss", $user_id, $username, $password_salted);
+            // bcrypt hash with a random salt per password
+            $password_hash = password_hash($password, PASSWORD_DEFAULT);
+            $insert_credential = $db_connection->prepare("INSERT INTO Credentials (user_id, username, password_hash) VALUES (?, ?, ?)");
+            $insert_credential->bind_param("iss", $user_id, $username, $password_hash);
 
             if ($insert_credential->execute()) {
                 $insert_credential->close();

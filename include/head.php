@@ -20,11 +20,11 @@
 ?>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<meta name="description" content="Website to show authentication">
+<meta name="description" content="Library Management System">
 <meta name="author" content="CSC 540 Team Project">
 <link rel="icon" href="./favicon.ico">
 
-<title>Basic Login Application</title>
+<title>Library Management System</title>
 
 <?php /* Google Fonts - Roboto flex */ ?>
 <link rel="preconnect" href="https://fonts.googleapis.com">
