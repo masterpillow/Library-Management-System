@@ -9,8 +9,7 @@
  */
 
 // Author: Joshua Connor - Added new validation logic (2026-02-24)
-// To use this configuration file, make sure to set the correct
-// database connection parameters below.  
+// The database login itself is in php/db_credentials.php.
 
 include_once (ROOT_PATH.'/php/path.php');
 
@@ -20,16 +19,18 @@ ini_set('display_errors', 1); // set to 1 to display errors, 0 to hide them
 // End of Error Reporting
 /* --------------------------------------------------------------------- */
 
-DEFINE('DB_HOST', "localhost");
-DEFINE('DB_USER', "root");
-DEFINE('DB_PASSWORD', ""); //Note: this should be your root password
-DEFINE('DB_NAME', "library_db");
+include_once (__DIR__ . '/db_credentials.php');
+
+mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 
 try {
-  $db_connection = new mysqli(DB_HOST, DB_USER, DB_PASSWORD, DB_NAME)
-    OR die("Connection failed: " . $db_connection->connect_error);
-} catch (Exception $e) {
-  echo 'Caught exception: ',  $e->getMessage(), "\n";
-} 
-  
+  $db_connection = new mysqli(DB_HOST, DB_USER, DB_PASSWORD, DB_NAME);
+} catch (mysqli_sql_exception $e) {
+  // Show how to fix it instead of a stack of PHP errors
+  http_response_code(500);
+  echo '<p style="font-family:sans-serif;max-width:40em;margin:3em auto">'
+     . htmlspecialchars(db_setup_message($e->getCode(), $e->getMessage())) . '</p>';
+  exit();
+}
+
 ?>

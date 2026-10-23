@@ -13,18 +13,15 @@
 error_reporting(-1);
 ini_set('display_errors', 'On');
 
-/* the first connection to the database */
-DEFINE('DB_HOST', "localhost");
-DEFINE('DB_USER', "root");
-DEFINE('DB_PASSWORD', ""); //Note: this should be your root password
-DEFINE('DB_NAME', "library_db"); // keep in sync with php/config.php
+/* Database login lives in php/db_credentials.php */
+include_once (__DIR__ . '/db_credentials.php');
 
 mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 
 try {
   $db_connection = new mysqli(DB_HOST, DB_USER, DB_PASSWORD);
-} catch (Exception $e) {
-  die('Connection failed: ' . $e->getMessage());
+} catch (mysqli_sql_exception $e) {
+  die(htmlspecialchars(db_setup_message($e->getCode(), $e->getMessage())));
 }
 
 function status($text) {
