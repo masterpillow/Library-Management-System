@@ -2,7 +2,7 @@
 
 A library web app where members search the catalog, check out and hold books, and track their loans, and admins manage books, copies, members, and staff picks.
 
-Team: Devon Kiddoo, Jermane Harrell, Brandon Apruzzese, Maximilian Musial
+Team: Devon Kiddoo, Brandon Apruzzese, Maximilian Musial
 
 Built on the CSC 235 login starter by Joshua Connor ([connorj4/csc235_login](https://github.com/connorj4/csc235_login)), which is for school projects only.
 
