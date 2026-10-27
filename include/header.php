@@ -50,7 +50,7 @@ if (!isset($_SESSION)) {
           /* User Information */
           if (isset($_SESSION['user_name']) && $_SESSION['user_role'] == 2) { // Only display when user is logged in
             echo '<li class="nav-item"><a class="nav-link" href="index.php">User Dashboard</a></li>';
-            echo '<li class="nav-item"><a class="nav-link" href="#">New Page</a></li>';
+            echo '<li class="nav-item"><a class="nav-link" href="account.php">My Account</a></li>';
           }
         ?>
         <?php
@@ -65,7 +65,7 @@ if (!isset($_SESSION)) {
         <?php
             /* User Information */
             if (isset($_SESSION['user_first']) && isset($_SESSION['user_type'])) {
-                echo 'Welcome ' . $_SESSION['user_first'] . ' (' . $_SESSION['user_type'] . ')';
+                echo 'Welcome ' . htmlspecialchars($_SESSION['user_first']) . ' (' . htmlspecialchars($_SESSION['user_type']) . ')';
                 echo ' | <a href="../php/logout.php">Logout</a>';
             } else {
                 echo 'Not Logged In';
