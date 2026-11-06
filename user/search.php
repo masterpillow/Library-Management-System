@@ -16,7 +16,7 @@ $search_term = '';
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['query'])) {
     $search_term = trim($_GET['query']);
     
-    // MariaDB Prepared Statement joining Books, Authors, Genres, and Copies
+    // MariaDB Prepared Statement joining Books, Authors, Genres, Copies, and Ratings
     $sql = "SELECT 
                 b.book_id, 
                 b.title, 
@@ -24,12 +24,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['query'])) {
                 CONCAT(a.first_name, ' ', a.last_name) AS author_name, 
                 g.name AS genre_name,
                 COUNT(c.copy_id) AS total_copies,
-                SUM(CASE WHEN c.status = 'available' THEN 1 ELSE 0 END) AS available_copies
+                SUM(CASE WHEN c.status = 'available' THEN 1 ELSE 0 END) AS available_copies,
+                AVG(r.rating) AS average_rating,
+                COUNT(r.rating) AS total_reviews
             FROM Books b
             JOIN Book_Authors ba ON b.book_id = ba.book_id
             JOIN Authors a ON ba.author_id = a.author_id
             JOIN Genres g ON b.genre_id = g.genre_id
             LEFT JOIN Copies c ON b.book_id = c.book_id
+            LEFT JOIN Ratings r ON b.book_id = r.book_id
             WHERE b.is_active = 1 
               AND (b.title LIKE ? OR a.first_name LIKE ? OR a.last_name LIKE ? OR g.name LIKE ?)
             GROUP BY b.book_id, b.title, b.isbn, author_name, g.name";
@@ -71,7 +74,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['query'])) {
 
     <div class="container">
         <div class="row justify-content-center">
-            <div class="col-md-10">
+            <div class="col-md-11">
                 
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <h2>Search Library Catalog</h2>
@@ -102,6 +105,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['query'])) {
                                             <th>Author</th>
                                             <th>Genre</th>
                                             <th>ISBN</th>
+                                            <th>Rating & Review</th>
                                             <th>Availability</th>
                                             <th class="text-end">Action</th>
                                         </tr>
@@ -113,6 +117,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['query'])) {
                                                 <td><?= htmlspecialchars($book['author_name']) ?></td>
                                                 <td><span class="badge bg-secondary"><?= htmlspecialchars($book['genre_name'] ?? 'General') ?></span></td>
                                                 <td><code><?= htmlspecialchars($book['isbn'] ?? 'N/A') ?></code></td>
+                                                
+                                                <!-- Rating Display & Submission Form Cell -->
+                                                <td>
+                                                    <?php if ($book['average_rating'] !== null): ?>
+                                                        <span class="badge bg-info mb-1"><?= number_format($book['average_rating'], 1) ?> (<?= $book['total_reviews'] ?>)</span>
+                                                    <?php else: ?>
+                                                        <span class="badge bg-secondary mb-1">No ratings</span>
+                                                    <?php endif; ?>
+
+                                                    <form action="../php/submit_rating.php" method="POST" class="d-flex align-items-center gap-1 mt-1">
+                                                        <input type="hidden" name="book_id" value="<?= $book['book_id'] ?>">
+                                                        <select name="rating" class="form-select form-select-sm" style="width: 70px;" required>
+                                                            <option value="" disabled selected>★</option>
+                                                            <option value="5">5</option>
+                                                            <option value="4">4</option>
+                                                            <option value="3">3</option>
+                                                            <option value="2">2</option>
+                                                            <option value="1">1</option>
+                                                        </select>
+                                                        <button type="submit" class="btn btn-outline-primary btn-sm py-0 px-1" style="font-size: 0.75rem;">Save</button>
+                                                    </form>
+                                                </td>
+
                                                 <td>
                                                     <?php if ($book['available_copies'] > 0): ?>
                                                         <span class="badge bg-success"><?= $book['available_copies'] ?> Available</span>
