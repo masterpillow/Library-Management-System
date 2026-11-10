@@ -264,28 +264,64 @@ $insert_user->close();
 $insert_cred->close();
 
 /* Catalog */
+/* Catalog: Genres */
 $db_connection->query("INSERT INTO Genres (genre_id, name) VALUES
-    (1, 'Fiction'), (2, 'Classic'), (3, 'Fantasy'), (4, 'Dystopian')");
+    (1, 'Fiction'), 
+    (2, 'Classic'), 
+    (3, 'Fantasy'), 
+    (4, 'Dystopian'), 
+    (5, 'Computer Science'), 
+    (6, 'Historical Fiction'), 
+    (7, 'Science Fiction'),
+    (8, 'Mystery')");
 
+/* Catalog: Authors */
 $db_connection->query("INSERT INTO Authors (author_id, first_name, last_name) VALUES
     (1, 'Harper', 'Lee'),
     (2, 'George', 'Orwell'),
     (3, 'Jane', 'Austen'),
     (4, 'F. Scott', 'Fitzgerald'),
     (5, 'Toni', 'Morrison'),
-    (6, 'J.R.R.', 'Tolkien')");
+    (6, 'J.R.R.', 'Tolkien'),
+    (7, 'Abraham', 'Silberschatz'),
+    (8, 'Meg', 'Waite Clayton'),
+    (9, 'Frank', 'Herbert'),
+    (10, 'Agatha', 'Christie')");
 
+/* Catalog: Publishers (Optional if your schema tracks them) */
+$db_connection->query("INSERT INTO Publishers (publisher_id, name) VALUES
+    (1, 'Penguin Random House'),
+    (2, 'O\'Reilly Media'),
+    (3, 'HarperCollins'),
+    (4, 'Scribner')");
+
+/* Catalog: Books (Linking genre_id) */
 $db_connection->query("INSERT INTO Books (book_id, title, genre_id, release_year) VALUES
     (1, 'To Kill a Mockingbird', 1, 1960),
     (2, 'Nineteen Eighty-Four', 4, 1949),
     (3, 'Pride and Prejudice', 2, 1813),
     (4, 'The Great Gatsby', 2, 1925),
     (5, 'Beloved', 1, 1987),
-    (6, 'The Hobbit', 3, 1937)");
+    (6, 'The Hobbit', 3, 1937),
+    (7, 'Database System Concepts', 5, 2020),
+    (8, 'The Last Train to London', 6, 2019),
+    (9, 'Dune', 7, 1965),
+    (10, 'And Then There Were None', 8, 1939)");
 
+/* Catalog: Book-Author Relationships (Junction Table) */
 $db_connection->query("INSERT INTO Book_Authors (book_id, author_id) VALUES
-    (1, 1), (2, 2), (3, 3), (4, 4), (5, 5), (6, 6)");
+    (1, 1), 
+    (2, 2), 
+    (3, 3), 
+    (4, 4), 
+    (5, 5), 
+    (6, 6),
+    (7, 7),
+    (8, 8),
+    (9, 9),
+    (10, 10)");
 
+/* Catalog: Physical Copies for Circulation */
 /* Two copies of most books, one copy of The Hobbit (so holds can be tested) */
 $db_connection->query("INSERT INTO Copies (book_id, barcode, status) VALUES
     (1, 'LMS-0001', 'available'), (1, 'LMS-0002', 'available'),
@@ -293,7 +329,11 @@ $db_connection->query("INSERT INTO Copies (book_id, barcode, status) VALUES
     (3, 'LMS-0005', 'available'), (3, 'LMS-0006', 'available'),
     (4, 'LMS-0007', 'available'), (4, 'LMS-0008', 'available'),
     (5, 'LMS-0009', 'available'), (5, 'LMS-0010', 'available'),
-    (6, 'LMS-0011', 'on_loan')");
+    (6, 'LMS-0011', 'on_loan'),  
+    (7, 'LMS-0012', 'available'), (7, 'LMS-0013', 'available'),
+    (8, 'LMS-0014', 'available'), 
+    (9, 'LMS-0015', 'available'), (9, 'LMS-0016', 'available'),
+    (10, 'LMS-0017', 'available')");
 
 /* Jane (user 2) has The Hobbit checked out, due in 21 days */
 $db_connection->query("INSERT INTO Loans (copy_id, user_id, checkout_date, due_date) VALUES
