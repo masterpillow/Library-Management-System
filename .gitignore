@@ -1,0 +1,9 @@
+# Ignore local database credentials
+config.local.php
+
+# Operating System junk files
+.DS_Store
+Thumbs.db
+
+# VS Code settings folder
+.vscode/
