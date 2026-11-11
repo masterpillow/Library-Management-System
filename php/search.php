@@ -9,8 +9,6 @@ if (isset($_GET['query']) && trim($_GET['query']) !== '') {
     $searchQuery = trim($_GET['query']);
 
     try {
-        // SQL query joining Books, Book_Authors, authors, and genres tables
-        // (Note: Adjust 'g.name' to 'g.genre_name' if your genres table uses a different column name for the genre title)
         $sql = "SELECT DISTINCT b.*, a.first_name, a.last_name, g.name AS genre_name 
                 FROM Books b 
                 LEFT JOIN Book_Authors ba ON b.book_id = ba.book_id 
@@ -22,7 +20,6 @@ if (isset($_GET['query']) && trim($_GET['query']) !== '') {
         
         $wildcardQuery = '%' . $searchQuery . '%';
         
-        // "ssss" for title, genre name, author first name, and author last name
         $stmt->bind_param("ssss", $wildcardQuery, $wildcardQuery, $wildcardQuery, $wildcardQuery);
         $stmt->execute();
         
@@ -44,7 +41,7 @@ if (isset($_GET['query']) && trim($_GET['query']) !== '') {
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            max-width: 800px;
+            max-width: 900px;
             margin: 40px auto;
             padding: 0 20px;
             color: #333;
@@ -65,7 +62,7 @@ if (isset($_GET['query']) && trim($_GET['query']) !== '') {
             border: 1px solid #ccc;
             border-radius: 6px;
         }
-        button {
+        button[type="submit"] {
             padding: 10px 20px;
             font-size: 16px;
             background-color: #0066cc;
@@ -74,7 +71,7 @@ if (isset($_GET['query']) && trim($_GET['query']) !== '') {
             border-radius: 6px;
             cursor: pointer;
         }
-        button:hover {
+        button[type="submit"]:hover {
             background-color: #0052a3;
         }
         table {
@@ -104,6 +101,30 @@ if (isset($_GET['query']) && trim($_GET['query']) !== '') {
             border-radius: 6px;
             border: 1px solid #f8d7da;
         }
+        .btn-action {
+            display: inline-block;
+            padding: 6px 12px;
+            font-size: 14px;
+            text-decoration: none;
+            border-radius: 4px;
+            margin-right: 6px;
+            font-weight: 500;
+        }
+        .btn-checkout {
+            background-color: #2b8a3e;
+            color: white;
+        }
+        .btn-checkout:hover {
+            background-color: #2b8a3e;
+            opacity: 0.9;
+        }
+        .btn-hold {
+            background-color: #e67700;
+            color: white;
+        }
+        .btn-hold:hover {
+            opacity: 0.9;
+        }
     </style>
 </head>
 <body>
@@ -128,15 +149,22 @@ if (isset($_GET['query']) && trim($_GET['query']) !== '') {
                         <th>Title</th>
                         <th>Author</th>
                         <th>Genre</th>
+                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <?php foreach ($books as $book): ?>
+                    <?php foreach ($books as $book): 
+                        $bookId = $book['book_id'] ?? $book['id'] ?? '';
+                    ?>
                         <tr>
-                            <td><?php echo htmlspecialchars($book['book_id'] ?? $book['id'] ?? ''); ?></td>
+                            <td><?php echo htmlspecialchars($bookId); ?></td>
                             <td><?php echo htmlspecialchars($book['title'] ?? ''); ?></td>
                             <td><?php echo htmlspecialchars(trim(($book['first_name'] ?? '') . ' ' . ($book['last_name'] ?? ''))); ?></td>
                             <td><?php echo htmlspecialchars($book['genre_name'] ?? $book['genre'] ?? ''); ?></td>
+                            <td>
+                                <a href="checkout.php?book_id=<?php echo urlencode($bookId); ?>" class="btn-action btn-checkout">Checkout</a>
+                                <a href="hold.php?book_id=<?php echo urlencode($bookId); ?>" class="btn-action btn-hold">Hold</a>
+                            </td>
                         </tr>
                     <?php endforeach; ?>
                 </tbody>
