@@ -1,0 +1,149 @@
+<?php
+require_once 'path.php';
+require_once 'config.php';
+
+$searchQuery = "";
+$books = [];
+
+if (isset($_GET['query']) && trim($_GET['query']) !== '') {
+    $searchQuery = trim($_GET['query']);
+
+    try {
+        // SQL query joining Books, Book_Authors, authors, and genres tables
+        // (Note: Adjust 'g.name' to 'g.genre_name' if your genres table uses a different column name for the genre title)
+        $sql = "SELECT DISTINCT b.*, a.first_name, a.last_name, g.name AS genre_name 
+                FROM Books b 
+                LEFT JOIN Book_Authors ba ON b.book_id = ba.book_id 
+                LEFT JOIN authors a ON ba.author_id = a.author_id 
+                LEFT JOIN genres g ON b.genre_id = g.genre_id 
+                WHERE b.title LIKE ? OR g.name LIKE ? OR a.first_name LIKE ? OR a.last_name LIKE ?";
+                
+        $stmt = $db_connection->prepare($sql);
+        
+        $wildcardQuery = '%' . $searchQuery . '%';
+        
+        // "ssss" for title, genre name, author first name, and author last name
+        $stmt->bind_param("ssss", $wildcardQuery, $wildcardQuery, $wildcardQuery, $wildcardQuery);
+        $stmt->execute();
+        
+        $result = $stmt->get_result();
+        $books = $result->fetch_all(MYSQLI_ASSOC);
+        
+        $stmt->close();
+
+    } catch (mysqli_sql_exception $e) {
+        $error = "Database error: " . htmlspecialchars($e->getMessage());
+    }
+}
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Library Book Search</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 0 20px;
+            color: #333;
+            background-color: #f9f9fb;
+        }
+        h1, h2 {
+            color: #111;
+        }
+        form {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+        }
+        input[type="text"] {
+            flex: 1;
+            padding: 10px 14px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #0066cc;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0052a3;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        th, td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+        th {
+            background-color: #f1f3f5;
+            font-weight: 600;
+        }
+        tr:last-child td {
+            border-bottom: none;
+        }
+        .error {
+            color: #d93838;
+            background: #fdf2f2;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #f8d7da;
+        }
+    </style>
+</head>
+<body>
+    <h1>Library Book Search</h1>
+
+    <form method="GET" action="search.php">
+        <input type="text" name="query" value="<?php echo htmlspecialchars($searchQuery); ?>" placeholder="Search by title, author, or genre..." required>
+        <button type="submit">Search</button>
+    </form>
+
+    <?php if (isset($error)): ?>
+        <div class="error"><?php echo $error; ?></div>
+    <?php endif; ?>
+
+    <?php if (!empty($searchQuery)): ?>
+        <h2>Results for "<?php echo htmlspecialchars($searchQuery); ?>"</h2>
+        <?php if (count($books) > 0): ?>
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Title</th>
+                        <th>Author</th>
+                        <th>Genre</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($books as $book): ?>
+                        <tr>
+                            <td><?php echo htmlspecialchars($book['book_id'] ?? $book['id'] ?? ''); ?></td>
+                            <td><?php echo htmlspecialchars($book['title'] ?? ''); ?></td>
+                            <td><?php echo htmlspecialchars(trim(($book['first_name'] ?? '') . ' ' . ($book['last_name'] ?? ''))); ?></td>
+                            <td><?php echo htmlspecialchars($book['genre_name'] ?? $book['genre'] ?? ''); ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        <?php else: ?>
+            <p>No books found matching your search.</p>
+        <?php endif; ?>
+    <?php endif; ?>
+</body>
+</html>
