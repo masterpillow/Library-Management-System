@@ -1,173 +1,123 @@
 <?php
-// Step 1: Session & Path Initialization
+// ======================================================================
+// USER SEARCH CATALOG (Synced with backend search & copy_id checkout)
+// ======================================================================
 require_once '../php/path.php';
-require_once ROOT_PATH . '/php/session.php';
+require_once '../php/session.php';
+require_once '../php/config.php';
 
-// Step 2: Role Access Control (Member / Role 2 Only)
-if ($_SESSION['user_role'] != 2) {
+// Role Access Control (Member / Role 2 Only)
+if (!isset($_SESSION['user_role']) || $_SESSION['user_role'] != 2) {
     header("Location: " . BASE_URL . "/index.php");
     exit();
 }
 
-$search_results = [];
-$search_term = '';
+$searchQuery = "";
+$books = [];
 
-// Step 3: Handle Search Query Submission
-if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET['query'])) {
-    $search_term = trim($_GET['query']);
-    
-    // MariaDB Prepared Statement joining Books, Authors, Genres, Copies, and Ratings
-    $sql = "SELECT 
-                b.book_id, 
-                b.title, 
-                b.isbn, 
-                CONCAT(a.first_name, ' ', a.last_name) AS author_name, 
-                g.name AS genre_name,
-                COUNT(c.copy_id) AS total_copies,
-                SUM(CASE WHEN c.status = 'available' THEN 1 ELSE 0 END) AS available_copies,
-                AVG(r.rating) AS average_rating,
-                COUNT(r.rating) AS total_reviews
-            FROM Books b
-            JOIN Book_Authors ba ON b.book_id = ba.book_id
-            JOIN Authors a ON ba.author_id = a.author_id
-            JOIN Genres g ON b.genre_id = g.genre_id
-            LEFT JOIN Copies c ON b.book_id = c.book_id
-            LEFT JOIN Ratings r ON b.book_id = r.book_id
-            WHERE b.is_active = 1 
-              AND (b.title LIKE ? OR a.first_name LIKE ? OR a.last_name LIKE ? OR g.name LIKE ?)
-            GROUP BY b.book_id, b.title, b.isbn, author_name, g.name";
+if (isset($_GET['query']) && trim($_GET['query']) !== '') {
+    $searchQuery = trim($_GET['query']);
 
-    $stmt = $db_connection->prepare($sql);
-    $like_term = '%' . $search_term . '%';
-    
-    // Bind search parameters safely to prevent SQL injection
-    $stmt->bind_param("ssss", $like_term, $like_term, $like_term, $like_term);
-    $stmt->execute();
-    
-    $result = $stmt->get_result();
-    while ($row = $result->fetch_assoc()) {
-        $search_results[] = $row;
+    try {
+        $sql = "SELECT DISTINCT b.*, a.first_name, a.last_name, g.name AS genre_name,
+                       (SELECT copy_id FROM Copies WHERE book_id = b.book_id AND status = 'available' LIMIT 1) AS available_copy_id
+                FROM Books b 
+                LEFT JOIN Book_Authors ba ON b.book_id = ba.book_id 
+                LEFT JOIN authors a ON ba.author_id = a.author_id 
+                LEFT JOIN genres g ON b.genre_id = g.genre_id 
+                WHERE b.title LIKE ? OR g.name LIKE ? OR a.first_name LIKE ? OR a.last_name LIKE ?";
+                
+        $stmt = $db_connection->prepare($sql);
+        $wildcardQuery = '%' . $searchQuery . '%';
+        $stmt->bind_param("ssss", $wildcardQuery, $wildcardQuery, $wildcardQuery, $wildcardQuery);
+        $stmt->execute();
+        
+        $result = $stmt->get_result();
+        $books = $result->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+
+    } catch (mysqli_sql_exception $e) {
+        $error = "Database error: " . htmlspecialchars($e->getMessage());
     }
-    $stmt->close();
 }
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Search Catalog - Library System</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <title>Library Book Search</title>
+    <style>
+        body { font-family: sans-serif; max-width: 900px; margin: 40px auto; padding: 0 20px; background: #f9f9fb; color: #333; }
+        .nav-back { margin-bottom: 20px; }
+        .nav-back a { color: #0066cc; text-decoration: none; font-weight: 500; }
+        .nav-back a:hover { text-decoration: underline; }
+        form { display: flex; gap: 10px; margin-bottom: 30px; }
+        input[type="text"] { flex: 1; padding: 10px; font-size: 16px; border: 1px solid #ccc; border-radius: 6px; }
+        button[type="submit"] { padding: 10px 20px; font-size: 16px; background: #0066cc; color: white; border: none; border-radius: 6px; cursor: pointer; }
+        table { width: 100%; border-collapse: collapse; background: white; border-radius: 6px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        th, td { padding: 12px 16px; text-align: left; border-bottom: 1px solid #eee; }
+        th { background: #f1f3f5; }
+        .btn-action { display: inline-block; padding: 6px 12px; font-size: 14px; text-decoration: none; border-radius: 4px; margin-right: 6px; font-weight: 500; color: white; }
+        .btn-checkout { background: #2b8a3e; }
+        .btn-hold { background: #e67700; }
+        .error { color: #d93838; background: #fdf2f2; padding: 10px; border-radius: 6px; }
+    </style>
 </head>
-<body class="bg-light">
-
-    <!-- Header Navigation Bar -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
-        <div class="container">
-            <a class="navbar-brand fw-bold" href="index.php">Library System</a>
-            <div class="d-flex align-items-center">
-                <span class="text-white me-3">Welcome, <?= htmlspecialchars($_SESSION['user_first']) ?></span>
-                <a href="../php/logout.php" class="btn btn-outline-light btn-sm">Logout</a>
-            </div>
-        </div>
-    </nav>
-
-    <div class="container">
-        <div class="row justify-content-center">
-            <div class="col-md-11">
-                
-                <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h2>Search Library Catalog</h2>
-                    <a href="index.php" class="btn btn-outline-secondary btn-sm">← Back to Dashboard</a>
-                </div>
-                
-                <!-- Search Form -->
-                <form action="search.php" method="GET" class="card p-3 shadow-sm mb-4">
-                    <div class="input-group">
-                        <input type="text" name="query" class="form-control form-control-lg" 
-                               placeholder="Search by title, author, or genre..." 
-                               value="<?= htmlspecialchars($search_term) ?>" required>
-                        <button type="submit" class="btn btn-primary btn-lg">Search Catalog</button>
-                    </div>
-                </form>
-
-                <!-- Results Output -->
-                <?php if (!empty($search_term)): ?>
-                    <h5 class="mb-3">Search Results for "<?= htmlspecialchars($search_term) ?>"</h5>
-                    
-                    <?php if (count($search_results) > 0): ?>
-                        <div class="card shadow-sm">
-                            <div class="card-body p-0">
-                                <table class="table table-hover align-middle mb-0">
-                                    <thead class="table-light">
-                                        <tr>
-                                            <th>Title</th>
-                                            <th>Author</th>
-                                            <th>Genre</th>
-                                            <th>ISBN</th>
-                                            <th>Rating & Review</th>
-                                            <th>Availability</th>
-                                            <th class="text-end">Action</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <?php foreach ($search_results as $book): ?>
-                                            <tr>
-                                                <td class="fw-bold"><?= htmlspecialchars($book['title']) ?></td>
-                                                <td><?= htmlspecialchars($book['author_name']) ?></td>
-                                                <td><span class="badge bg-secondary"><?= htmlspecialchars($book['genre_name'] ?? 'General') ?></span></td>
-                                                <td><code><?= htmlspecialchars($book['isbn'] ?? 'N/A') ?></code></td>
-                                                
-                                                <!-- Rating Display & Submission Form Cell -->
-                                                <td>
-                                                    <?php if ($book['average_rating'] !== null): ?>
-                                                        <span class="badge bg-info mb-1"><?= number_format($book['average_rating'], 1) ?> (<?= $book['total_reviews'] ?>)</span>
-                                                    <?php else: ?>
-                                                        <span class="badge bg-secondary mb-1">No ratings</span>
-                                                    <?php endif; ?>
-
-                                                    <form action="../php/submit_rating.php" method="POST" class="d-flex align-items-center gap-1 mt-1">
-                                                        <input type="hidden" name="book_id" value="<?= $book['book_id'] ?>">
-                                                        <select name="rating" class="form-select form-select-sm" style="width: 70px;" required>
-                                                            <option value="" disabled selected>★</option>
-                                                            <option value="5">5</option>
-                                                            <option value="4">4</option>
-                                                            <option value="3">3</option>
-                                                            <option value="2">2</option>
-                                                            <option value="1">1</option>
-                                                        </select>
-                                                        <button type="submit" class="btn btn-outline-primary btn-sm py-0 px-1" style="font-size: 0.75rem;">Save</button>
-                                                    </form>
-                                                </td>
-
-                                                <td>
-                                                    <?php if ($book['available_copies'] > 0): ?>
-                                                        <span class="badge bg-success"><?= $book['available_copies'] ?> Available</span>
-                                                    <?php else: ?>
-                                                        <span class="badge bg-warning text-dark">0 Available (On Loan)</span>
-                                                    <?php endif; ?>
-                                                </td>
-                                                <td class="text-end">
-                                                    <?php if ($book['available_copies'] > 0): ?>
-                                                        <a href="checkout.php?book_id=<?= $book['book_id'] ?>" class="btn btn-sm btn-primary">Check Out</a>
-                                                    <?php else: ?>
-                                                        <a href="hold.php?book_id=<?= $book['book_id'] ?>" class="btn btn-sm btn-outline-secondary">Place Hold</a>
-                                                    <?php endif; ?>
-                                                </td>
-                                            </tr>
-                                        <?php endforeach; ?>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    <?php else: ?>
-                        <div class="alert alert-warning shadow-sm">No catalog items matched your search query. Try searching for "Orwell", "Classic", or "Gatsby".</div>
-                    <?php endif; ?>
-                <?php endif; ?>
-
-            </div>
-        </div>
+<body>
+    <div class="nav-back">
+        <a href="index.php">&larr; Back to Member Dashboard</a>
     </div>
 
+    <h1>Library Book Search</h1>
+
+    <form method="GET" action="search.php">
+        <input type="text" name="query" value="<?php echo htmlspecialchars($searchQuery); ?>" placeholder="Search by title, author, or genre..." required>
+        <button type="submit">Search</button>
+    </form>
+
+    <?php if (isset($error)): ?>
+        <div class="error"><?php echo $error; ?></div>
+    <?php endif; ?>
+
+    <?php if (!empty($searchQuery)): ?>
+        <h2>Results for "<?php echo htmlspecialchars($searchQuery); ?>"</h2>
+        <?php if (count($books) > 0): ?>
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Title</th>
+                        <th>Author</th>
+                        <th>Genre</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($books as $book): 
+                        $bookId = $book['book_id'] ?? $book['id'] ?? '';
+                        $copyId = $book['available_copy_id'] ?? '';
+                    ?>
+                        <tr>
+                            <td><?php echo htmlspecialchars($bookId); ?></td>
+                            <td><?php echo htmlspecialchars($book['title'] ?? ''); ?></td>
+                            <td><?php echo htmlspecialchars(trim(($book['first_name'] ?? '') . ' ' . ($book['last_name'] ?? ''))); ?></td>
+                            <td><?php echo htmlspecialchars($book['genre_name'] ?? ''); ?></td>
+                            <td>
+                                <?php if (!empty($copyId)): ?>
+                                    <a href="../php/member-checkout.php?copy_id=<?php echo urlencode($copyId); ?>" class="btn-action btn-checkout">Checkout</a>
+                                <?php else: ?>
+                                    <span class="btn-action" style="background: #adb5bd; cursor: not-allowed;">Unavailable</span>
+                                <?php endif; ?>
+                                
+                                <a href="../php/member-hold.php?book_id=<?php echo urlencode($bookId); ?>" class="btn-action btn-hold">Hold</a>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        <?php else: ?>
+            <p>No books found matching your search.</p>
+        <?php endif; ?>
+    <?php endif; ?>
 </body>
 </html>

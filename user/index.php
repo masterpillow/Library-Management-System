@@ -54,7 +54,7 @@ ini_set('display_errors', 0); // set to 1 to display errors, 0 to hide them
             <div class="card-body p-4">
               <h5 class="card-title text-success fw-bold">My Active Loans</h5>
               <p class="card-text text-secondary">View items currently checked out to your account and track upcoming due dates.</p>
-              <a href="loans.php" class="btn btn-outline-success">View My Loans</a>
+              <a href="../php/my_loans.php" class="btn btn-outline-success">View My Loans</a>
             </div>
           </div>
         </div>

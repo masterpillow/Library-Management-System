@@ -58,7 +58,7 @@ if ($found && password_verify($password, $password_hash)) {
   if ($user_role == 1) {
     header("location: " . BASE_URL . "/admin");
   } elseif ($user_role == 2) {
-    header("location: " . BASE_URL . "/user");
+    header("location: " . BASE_URL . "/user/index.php");
   } elseif ($user_role == 3) {
     header("location: " . BASE_URL . "/guest");
   } else {

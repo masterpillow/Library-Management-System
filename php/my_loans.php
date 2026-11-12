@@ -58,8 +58,10 @@ $holds = $db_connection->query("
 <body>
     <div class="container">
         <h1>My Library Account</h1>
-        <p><a href="search.php">&larr; Back to Search</a></p>
-
+    <p>
+        <a href="../user/index.php">&larr; Back to Dashboard</a> | 
+        <a href="../user/search.php">Back to Search Catalog</a>
+    </p>
         <?php if ($msg === 'checkout_success'): ?>
             <div class="alert">Book successfully checked out!</div>
         <?php elseif ($msg === 'hold_success'): ?>
