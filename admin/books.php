@@ -1,0 +1,37 @@
+<?php
+include_once(__DIR__ . '/../php/check_admin.php');
+$page_name = "admin";
+
+$books = $db_connection->query("
+  SELECT b.book_id, b.title, b.release_year, g.name AS genre,
+         GROUP_CONCAT(CONCAT(a.first_name, ' ', a.last_name) SEPARATOR ', ') AS authors
+  FROM Books b
+  LEFT JOIN Genres g ON b.genre_id = g.genre_id
+  LEFT JOIN Book_Authors ba ON b.book_id = ba.book_id
+  LEFT JOIN Authors a ON ba.author_id = a.author_id
+  WHERE b.is_active = 1
+  GROUP BY b.book_id
+  ORDER BY b.title
+");
+?>
+<!doctype html>
+<html lang="en">
+<head><?php include_once(ROOT_PATH . '/include/head.php'); ?></head>
+<body class="admin">
+<?php include_once(ROOT_PATH . '/include/header.php'); ?>
+<main class="container">
+  <h1>Manage Books</h1>
+  <table class="table">
+    <tr><th>Title</th><th>Authors</th><th>Genre</th><th>Year</th></tr>
+    <?php while ($row = $books->fetch_assoc()): ?>
+      <tr>
+        <td><?= htmlspecialchars($row['title']) ?></td>
+        <td><?= htmlspecialchars($row['authors'] ?? '') ?></td>
+        <td><?= htmlspecialchars($row['genre'] ?? '') ?></td>
+        <td><?= htmlspecialchars($row['release_year']) ?></td>
+      </tr>
+    <?php endwhile; ?>
+  </table>
+</main>
+</body>
+</html>
