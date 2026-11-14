@@ -9,7 +9,7 @@ $msg = $_GET['msg'] ?? '';
 
 // Fetch loans and calculate total unpaid fines
 $loans = $db_connection->query("
-  SELECT l.loan_id, b.title, l.due_date, l.return_date AS returned, l.fine
+  SELECT l.loan_id, b.title, l.due_date, l.return_date AS returned, l.fine, l.rating
   FROM Loans l
   JOIN Copies c ON l.copy_id = c.copy_id
   JOIN Books b ON c.book_id = b.book_id
@@ -68,6 +68,10 @@ $holds = $db_connection->query("
             <div class="alert">Hold placed successfully!</div>
         <?php elseif ($msg === 'hold_cancelled'): ?>
             <div class="alert">Hold successfully cancelled.</div>
+        <?php elseif ($msg === 'hold_duplicate'): ?>
+            <div class="alert-warning">You already have an active hold for this book.</div>
+        <?php elseif ($msg === 'rating_success'): ?>
+            <div class="alert">Rating saved successfully! Thank you for your feedback.</div>
         <?php elseif ($msg === 'return_success'): ?>
             <div class="alert">Book successfully returned!</div>
         <?php elseif ($msg === 'fine_paid'): ?>
@@ -90,6 +94,7 @@ $holds = $db_connection->query("
                         <th>Due Date</th>
                         <th>Status</th>
                         <th>Fine</th>
+                        <th>Rating</th>
                         <th>Action</th>
                     </tr>
                 </thead>
@@ -117,6 +122,26 @@ $holds = $db_connection->query("
 
                                 <?php if (!empty($row['returned']) && $row['fine'] == 0): ?>
                                     <span style="color: #95a5a6;">Completed</span>
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <?php if (!empty($row['rating'])): ?>
+                                    <span style="color: #f39c12; font-weight: bold;"><?php echo htmlspecialchars($row['rating']); ?> / 5 ★</span>
+                                <?php elseif (!empty($row['returned'])): ?>
+                                    <form action="rate-loan.php" method="POST" style="display:inline-flex; gap:5px; align-items:center;">
+                                        <input type="hidden" name="loan_id" value="<?php echo $row['loan_id']; ?>">
+                                        <select name="rating" required style="padding: 3px;">
+                                            <option value="" disabled selected>Rate</option>
+                                            <option value="5">5</option>
+                                            <option value="4">4</option>
+                                            <option value="3">3</option>
+                                            <option value="2">2</option>
+                                            <option value="1">1</option>
+                                        </select>
+                                        <button type="submit" style="padding: 3px 8px; background: #3498db; color: #fff; border: none; border-radius: 3px; cursor: pointer;">Save</button>
+                                    </form>
+                                <?php else: ?>
+                                    <span style="color: #95a5a6; font-style: italic;">Available after return</span>
                                 <?php endif; ?>
                             </td>
                         </tr>
