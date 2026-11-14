@@ -1,5 +1,6 @@
 <?php
-include_once(__DIR__ . '/config.php');
+include_once(realpath(dirname(__FILE__) . '/path.php'));
+include_once(ROOT_SRC_PATH . '/config.php');
 
 $message = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -26,18 +27,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <!doctype html>
 <html lang="en">
 <head>
-  <?php include_once(ROOT_PATH . '/include/head.php'); ?>
+  <meta charset="utf-8">
+  <title>Forgot Password</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
-<body class="member">
-  <?php include_once(ROOT_PATH . '/include/header.php'); ?>
-  <main class="container">
-    <h1>Forgot Password</h1>
-    <?php if ($message) echo "<p>$message</p>"; ?>
-    <form method="post">
+<body class="container py-5">
+  <h1>Forgot Password</h1>
+  <?php if ($message) echo "<div class='alert alert-info'>$message</div>"; ?>
+  <form method="post" class="mt-3">
+    <div class="mb-3">
       <label>Email</label>
-      <input type="email" name="email" required>
-      <button type="submit">Send Reset Link</button>
-    </form>
-  </main>
+      <input type="email" name="email" class="form-control" required>
+    </div>
+    <button type="submit" class="btn btn-primary">Send Reset Link</button>
+  </form>
+  <p class="mt-3"><a href="../index.php">Back to login</a></p>
 </body>
 </html>
