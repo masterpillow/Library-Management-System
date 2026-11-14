@@ -3,11 +3,11 @@
  * Header Include File
  *
  * @author    Joshua Connor <connorj4@southernct.edu>
- * @copyright 2026 
+ * @copyright 2026
  * @date      2026-02-24
  * @version   1.0
  */
-// 
+//
 if (!isset($_SESSION)) {
     // Only include session if not already started
     include_once (realpath(dirname(__FILE__).'/path.php'));
@@ -42,9 +42,11 @@ if (!isset($_SESSION)) {
         <?php
           /* User Information */
           if (isset($_SESSION['user_name']) && $_SESSION['user_role'] == 1) { // Only display when user is logged in
-            echo '<li class="nav-item"><a class="nav-link" href="index.php">Admin Dashboard</a></li>';
-            echo '<li class="nav-item"><a class="nav-link" href="#">New Page</a></li>';
-          }
+  echo '<li class="nav-item"><a class="nav-link" href="index.php">Admin Dashboard</a></li>';
+  echo '<li class="nav-item"><a class="nav-link" href="books.php">Manage Books</a></li>';
+  echo '<li class="nav-item"><a class="nav-link" href="copies.php">Manage Copies</a></li>';
+  echo '<li class="nav-item"><a class="nav-link" href="members.php">Manage Members</a></li>';
+}
         ?>
         <?php
           /* User Information */
