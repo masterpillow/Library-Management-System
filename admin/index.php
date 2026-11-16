@@ -47,6 +47,13 @@ ini_set('display_errors', 0); // set to 1 to display errors, 0 to hide them
       <section class="mb-4">
       <h2>All System Users</h2>
       <table class="table">
+    <div class="mb-4">
+      <a href="books.php" class="btn btn-primary me-2">Manage Books</a>
+      <a href="copies.php" class="btn btn-primary me-2">Manage Copies</a>
+      <a href="returns.php" class="btn btn-primary me-2">Manage Returns</a>
+      <a href="members.php" class="btn btn-primary me-2">Manage Members</a>
+      <a href="staff-picks.php" class="btn btn-primary">Staff Picks</a>
+    </div>
   <thead>
     <tr>
       <th scope="col">#</th>
