@@ -1,21 +1,12 @@
 /**
- * Javascript Main File
- *
- * @author    Joshua Connor <connorj4@southernct.edu>
- * @copyright 2026 
- * @date      2026-02-24
- * @version   1.0
- * @param     none
- * @return    void
+ * Library Management System scripts
  */
 
-// Output "program started" to the console
-console.log("program started");
-
-// go back to the prevous page
-function goBack() {
-  window.history.back();
-}
-
-// Output "completed" to the console
-console.log("program completed");
+// Ask before submitting any form marked with data-confirm="Question?"
+document.addEventListener('submit', function (event) {
+  var form = event.target;
+  var question = form.getAttribute('data-confirm');
+  if (question && !window.confirm(question)) {
+    event.preventDefault();
+  }
+});

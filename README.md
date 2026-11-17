@@ -34,11 +34,44 @@ XAMPP (Apache, MariaDB, PHP) with Bootstrap 5.3 from a CDN.
 
 ### Test accounts
 
-| Username | Password | Role |
-|---|---|---|
-| johndoe | SCSU2024 | administrator |
-| janesmith | SCSU2025 | user (member) |
-| charliebrown | SCSU2026 | guest |
+| Username | Password | Role | What's set up for the demo |
+|---|---|---|---|
+| johndoe | SCSU2024 | Admin | |
+| janesmith | SCSU2025 | Member | Has *The Hobbit* out, owes a $1.50 late fine, has rated two books |
+| mikejones | SCSU2027 | Member | *The Great Gatsby* is 5 days overdue; waiting on a hold for *The Hobbit* |
+| charliebrown | SCSU2026 | Guest | Can browse the catalog but not borrow |
+
+Rerun `php/start.php` any time to reset everything to this state.
+
+## What it does
+
+**Members**
+- Search and browse the catalog (all books, by author, staff picks), with copies on the shelf and average ratings
+- Check out a book, or place a hold when every copy is out
+- My Loans: due dates, overdue warnings, holds and place in line, fines, borrowing history, rate books 1 to 5
+- Return books, cancel holds, pay fines
+- My Account: update contact details, username, and password
+
+**Admins**
+- Dashboard with library totals and overdue books
+- Books: add, edit (including several authors), deactivate and reactivate
+- Copies: add copies with automatic barcodes, mark copies damaged, lost, or retired
+- Returns: check in books, which charges late fines and hands the copy to the next hold
+- Members: create accounts, edit details, role and membership, reset passwords, deactivate and reactivate
+- Staff picks: feature books with a blurb, using checkout counts and ratings to see what's popular
+
+**Guests** can browse the catalog. **Anyone** can create a member account or reset a forgotten password.
+
+## Library rules
+
+These live in `php/helpers.php` and match the Business Rules slide.
+
+- A book is a title; a copy is one physical book. A loan is always for one copy.
+- Loan length and the number of books a member can have out come from their membership (Standard: 5 books, 21 days; Extended: 10 books, 28 days).
+- Members with unpaid fines can't check out more books.
+- Late returns are charged **$0.25 per day**, added when the book comes back.
+- Holds are only for books with every copy out. First come, first served: a returned copy is set aside for the oldest hold for **3 days**, then goes to the next person.
+- Books and accounts are deactivated, never deleted, so history stays intact.
 
 ## Database
 
@@ -47,35 +80,35 @@ XAMPP (Apache, MariaDB, PHP) with Bootstrap 5.3 from a CDN.
 | Area | Tables |
 |---|---|
 | Login (starter) | `Roles`, `Contacts`, `Users`, `Credentials` |
-| Accounts (added) | `Memberships`, `Password_Resets` |
+| Accounts | `Memberships`, `Password_Resets` |
 | Catalog | `Authors`, `Publishers`, `Genres`, `Books`, `Book_Authors`, `Copies` |
 | Circulation | `Loans`, `Holds`, `Ratings`, `Staff_Picks` |
 
-Rules the database enforces:
+Rules the database enforces on its own:
 
-- A loan is for one copy, and a copy can't have two open loans at once (`Loans.open_copy_id` is unique while `return_date` is empty).
-- One rating per member per book, from 1 to 5.
-- Copy status is `available`, `on_loan`, `on_hold`, or `retired`. Hold status is `waiting`, `ready`, `fulfilled`, `cancelled`, or `expired`.
-- Members and books are deactivated with `is_active`, never deleted, so loan history stays intact.
+- A copy can't have two open loans (`Loans.open_copy_id` is unique while `return_date` is empty).
+- One rating per member per book, 1 to 5. One staff pick per book.
+- Copy status is `available`, `on_loan`, `on_hold`, `damaged`, `lost`, or `retired`. Hold status is `waiting`, `ready`, `fulfilled`, `cancelled`, or `expired`.
 
-Sample data: 6 books with copies, an active loan for Jane, one rating, and one staff pick.
+## Project layout
 
-## Changes from the starter
+| Folder | What's in it |
+|---|---|
+| `admin/` | Admin pages |
+| `user/` | Member pages (catalog, My Loans, My Account) |
+| `guest/` | Guest dashboard |
+| `php/` | Setup, login, member actions, and shared code |
+| `include/` | Page head, navbar, and footer used by every page |
+| `css/`, `js/` | Styles and the confirm-before-submit script |
 
-- Passwords use `password_hash` / `password_verify` (bcrypt). The starter used `crypt()` with a fixed salt, which falls back to DES and only checks the first 8 characters.
-- Role checks (`check_admin.php`, `check_user.php`, `check_guest.php`) now `exit()` after redirecting. Before, the rest of the protected page still ran and was sent to the browser.
-- `check_guest.php` checked for role 2 instead of 3, so guests were always logged out.
-- Failed logins show the error message on the login page instead of losing it on logout.
-- The user dashboard query uses a prepared statement instead of putting the username into the SQL.
-- Fixed broken paths: `db/error_rprt.php` → `php/error_rprt.php`, and the forgot-password form now posts to `php/recovery.php`.
-- Inactive accounts can't log in.
-- Database renamed from `login_db` to `library_db`; `password_salted` renamed to `password_hash`.
+To add a page, copy `template.php`. It shows the pattern every page follows: `require_role(...)`, set `$page_name` and `$page_title`, handle POST with `csrf_check()`, then `flash()` a message and `redirect()`.
 
-## Not built yet
+## Security
 
-- **Forgot password:** `php/recovery.php` is a placeholder. The `Password_Resets` table is ready for it.
-- **Member pages:** search, check out, place a hold, loan history, ratings.
-- **Admin pages:** books and authors, copies, members, staff picks, mark copy returned.
+- Passwords are hashed with bcrypt (`password_hash`). Password reset links store only a SHA-256 hash of the token and expire after an hour.
+- Every page checks the role before doing anything (`require_role`), and admins can't deactivate or demote themselves.
+- Every form that changes data carries a CSRF token, and actions only run on POST.
+- All SQL uses prepared statements, and everything shown on a page is escaped.
 
 ## Troubleshooting
 

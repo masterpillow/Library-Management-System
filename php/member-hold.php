@@ -1,38 +1,45 @@
 <?php
-require_once 'session.php';
-require_once 'path.php';
-require_once 'config.php';
+//======================================================================
+// MEMBER: place a hold on a book
+//======================================================================
+// Holds are only for books with every copy checked out. One active hold
+// per book per member. First come, first served by hold_date.
 
-$book_id = (int) ($_GET['book_id'] ?? 0);
-$user_id = (int) ($_SESSION['user_id'] ?? 1);
+include_once (__DIR__ . '/session.php');
+require_role(ROLE_MEMBER);
+require_post('user/search.php');
 
-// Verify book exists in Books table
-$book_check = $db_connection->query("SELECT book_id FROM Books WHERE book_id = $book_id")->fetch_assoc();
-if (!$book_check) { die("Book not found."); }
+$book_id = (int)(isset($_POST['book_id']) ? $_POST['book_id'] : 0);
 
-// Verify user exists in Users table
-$user_check = $db_connection->query("SELECT user_id FROM Users WHERE user_id = $user_id")->fetch_assoc();
-if (!$user_check) { die("User account not found."); }
+$q = $db_connection->prepare(
+  "SELECT b.title,
+          (SELECT COUNT(*) FROM Copies c WHERE c.book_id = b.book_id AND c.status = 'available') AS available,
+          (SELECT COUNT(*) FROM Copies c WHERE c.book_id = b.book_id AND c.status IN ('available', 'on_loan', 'on_hold')) AS in_circulation,
+          (SELECT COUNT(*) FROM Holds h WHERE h.book_id = b.book_id AND h.user_id = ? AND h.status IN ('waiting', 'ready')) AS my_holds,
+          (SELECT COUNT(*) FROM Loans l JOIN Copies c ON c.copy_id = l.copy_id
+            WHERE c.book_id = b.book_id AND l.user_id = ? AND l.return_date IS NULL) AS my_loans
+   FROM Books b WHERE b.book_id = ? AND b.is_active = 1");
+$q->bind_param('iii', $user_id, $user_id, $book_id);
+$q->execute();
+$book = $q->get_result()->fetch_assoc();
+$q->close();
 
-// PREVENT DUPLICATE HOLDS: Check if an active hold already exists for this user and book
-$duplicate_check = $db_connection->prepare("SELECT hold_id FROM Holds WHERE user_id = ? AND book_id = ? AND status IN ('waiting', 'ready')");
-$duplicate_check->bind_param("ii", $user_id, $book_id);
-$duplicate_check->execute();
-$duplicate_check->store_result();
-
-if ($duplicate_check->num_rows > 0) {
-    $duplicate_check->close();
-    header("Location: /Library-Management-System/php/my_loans.php?msg=hold_duplicate");
-    exit;
+if (!$book) {
+  flash('warning', 'That book is not in the catalog.');
+} elseif ($book['my_loans'] > 0) {
+  flash('warning', 'You already have "' . $book['title'] . '" checked out.');
+} elseif ($book['my_holds'] > 0) {
+  flash('info', 'You are already on the hold list for "' . $book['title'] . '".');
+} elseif ($book['available'] > 0) {
+  flash('info', 'A copy of "' . $book['title'] . '" is on the shelf, so you can check it out now instead.');
+} elseif ($book['in_circulation'] == 0) {
+  flash('warning', 'The library has no copies of "' . $book['title'] . '" to hold.');
+} else {
+  $ins = $db_connection->prepare("INSERT INTO Holds (book_id, user_id, status, hold_date) VALUES (?, ?, 'waiting', NOW())");
+  $ins->bind_param('ii', $book_id, $user_id);
+  $ins->execute();
+  $ins->close();
+  flash('success', 'You\'re on the hold list for "' . $book['title'] . '". When a copy comes back it will be set aside for you for ' . HOLD_PICKUP_DAYS . ' days.');
+  redirect('user/loans.php');
 }
-$duplicate_check->close();
-
-// Insert the hold request with the official 'waiting' status
-$stmt = $db_connection->prepare("INSERT INTO Holds (book_id, user_id, status, hold_date) VALUES (?, ?, 'waiting', CURDATE())");
-$stmt->bind_param("ii", $book_id, $user_id);
-$stmt->execute();
-$stmt->close();
-
-// Redirect back to your loans/account page
-header("Location: /Library-Management-System/php/my_loans.php?msg=hold_success");
-exit;
+redirect('user/search.php');

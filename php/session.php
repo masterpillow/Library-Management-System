@@ -6,8 +6,7 @@
 
   include_once (realpath(dirname(__FILE__).'/path.php'));
   include_once (ROOT_PATH . '/php/config.php');
-
-  session_start();
+  include_once (ROOT_PATH . '/php/helpers.php'); // starts the session
   
   $user_check = isset($_SESSION['login_user']) ? $_SESSION['login_user'] : '';
   // Check user and get roll session from database
@@ -45,8 +44,10 @@
   $select_user->close();
 
   if(!isset($user_id) || !isset($first_name) || !isset($user_type)){
-    header("location: " . BASE_URL . "/failed.html");
-    exit();
+    // Not logged in, or the account was deactivated
+    $_SESSION = [];
+    flash('warning', 'Please log in to continue.');
+    redirect('index.php');
   }
   // Close the mysql connection
   //mysqli_close($db_connection); 

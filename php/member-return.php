@@ -1,24 +1,24 @@
 <?php
-require_once 'session.php';
-require_once 'path.php';
-require_once 'config.php';
+//======================================================================
+// MEMBER: return a book (same rules as the admin Returns page)
+//======================================================================
+include_once (__DIR__ . '/session.php');
+require_role(ROLE_MEMBER);
+require_post('user/loans.php');
 
-$loan_id = (int) ($_GET['loan_id'] ?? 0);
-$user_id = (int) $_SESSION['user_id'];
+$loan_id = (int)(isset($_POST['loan_id']) ? $_POST['loan_id'] : 0);
 
-// Verify the loan belongs to the user and is currently active (not yet returned)
-$loan_query = $db_connection->query("SELECT copy_id FROM Loans WHERE loan_id = $loan_id AND user_id = $user_id AND return_date IS NULL");
-if ($loan_query && $loan_query->num_rows > 0) {
-    $loan = $loan_query->fetch_assoc();
-    $copy_id = (int) $loan['copy_id'];
+// Only the member's own open loan
+$own = $db_connection->prepare("SELECT loan_id FROM Loans WHERE loan_id = ? AND user_id = ? AND return_date IS NULL");
+$own->bind_param('ii', $loan_id, $user_id);
+$own->execute();
+$is_mine = (bool)$own->get_result()->fetch_assoc();
+$own->close();
 
-    // 1. Mark the loan as returned today
-    $db_connection->query("UPDATE Loans SET return_date = CURDATE() WHERE loan_id = $loan_id");
-
-    // 2. Set the book copy status back to 'available' so others can check it out
-    $db_connection->query("UPDATE Copies SET status = 'available' WHERE copy_id = $copy_id");
+if ($is_mine) {
+  $result = return_loan($db_connection, $loan_id);
+  flash('success', $result !== null ? $result : 'That loan was already returned.');
+} else {
+  flash('warning', 'That loan was not found.');
 }
-
-// Redirect back to account page with success message
-header("Location: /Library-Management-System/php/my_loans.php?msg=return_success");
-exit;
+redirect('user/loans.php');

@@ -9,43 +9,30 @@
 error_reporting(E_ALL);
 ini_set('display_errors', 0); // set to 1 to display errors, 0 to hide them
 
-  /* Quick Paths */
-  /* note the 2 after __FILE__, because it's 2 directories deep */
   include_once (realpath(dirname(__FILE__, 2).'/php/session.php')); // sets $user_id and opens $db_connection
-  include_once (realpath(dirname(__FILE__, 2).'/php/path.php'));
+  require_role(ROLE_MEMBER);
 
-  /* Check Role */
-  include_once (ROOT_SRC_PATH .'/check_user.php');
-
-  /* Page Name */
   $page_name = "account";
+  $page_title = "My Account";
 
 //----------------------------------------------------------------------
 // Helpers
 //----------------------------------------------------------------------
 
-/* One token per session, checked on every form, so another site can't submit these forms for the member */
-if (empty($_SESSION['csrf_token'])) {
-  $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-}
-
 /* Save a message for the next page load, then reload this page */
 function finish($type, $text) {
-  $_SESSION['account_flash'] = ['type' => $type, 'text' => $text];
-  header("location: " . BASE_URL . "/user/account.php");
-  exit();
+  flash($type, $text);
+  redirect('user/account.php');
 }
 
-$MIN_PASSWORD_LENGTH = 8;
+$MIN_PASSWORD_LENGTH = MIN_PASSWORD_LENGTH;
 
 //----------------------------------------------------------------------
 // Handle form submissions
 //----------------------------------------------------------------------
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
-  if (!isset($_POST['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
-    finish('danger', 'Your session expired. Please try again.');
-  }
+  csrf_check('user/account.php');
 
   $action = isset($_POST['action']) ? $_POST['action'] : '';
 
@@ -168,14 +155,7 @@ $select->execute();
 $me = $select->get_result()->fetch_assoc();
 $select->close();
 
-$flash = isset($_SESSION['account_flash']) ? $_SESSION['account_flash'] : null;
-unset($_SESSION['account_flash']);
-
-/* Escape for HTML output */
-function e($value) {
-  return htmlspecialchars((string)$value, ENT_QUOTES);
-}
-$token = e($_SESSION['csrf_token']);
+$token = e(csrf_token());
 
 ?>
 <!doctype html>
@@ -183,21 +163,19 @@ $token = e($_SESSION['csrf_token']);
   <head>
   <?php include_once (ROOT_PATH . '/include/head.php'); ?>
   </head>
-  <body class="<?php echo $page_name; ?>">
+  <body>
 
   <?php include_once (ROOT_PATH . '/include/header.php'); ?>
-    <main role="main" class="container mb-5 pb-5">
+    <main role="main" class="container">
       <div class="row justify-content-center">
         <div class="col-lg-8">
 
-          <h1 class="mb-4">My Account</h1>
+          <div class="page-header"><h1>My Account</h1></div>
 
-          <?php if ($flash): ?>
-            <div class="alert alert-<?php echo e($flash['type']); ?>" role="alert"><?php echo e($flash['text']); ?></div>
-          <?php endif; ?>
+          <?php show_flashes(); ?>
 
           <!-- Membership (read only: admins set this) -->
-          <section class="card mb-4">
+          <section class="card shadow-sm border-0 mb-4">
             <div class="card-body">
               <h2 class="h5 card-title">Membership</h2>
               <p class="mb-0">
@@ -208,7 +186,7 @@ $token = e($_SESSION['csrf_token']);
           </section>
 
           <!-- Contact details -->
-          <section class="card mb-4">
+          <section class="card shadow-sm border-0 mb-4">
             <div class="card-body">
               <h2 class="h5 card-title mb-3">Contact details</h2>
               <form method="post" action="account.php">
@@ -252,13 +230,13 @@ $token = e($_SESSION['csrf_token']);
                     <input type="text" class="form-control" id="post_code" name="post_code" value="<?php echo e($me['post_code']); ?>">
                   </div>
                 </div>
-                <button type="submit" class="btn btn-primary mt-3">Save details</button>
+                <button type="submit" class="btn btn-library mt-3">Save details</button>
               </form>
             </div>
           </section>
 
           <!-- Username -->
-          <section class="card mb-4">
+          <section class="card shadow-sm border-0 mb-4">
             <div class="card-body">
               <h2 class="h5 card-title mb-3">Username</h2>
               <form method="post" action="account.php">
@@ -267,13 +245,13 @@ $token = e($_SESSION['csrf_token']);
                 <label for="username" class="form-label">Username</label>
                 <input type="text" class="form-control" id="username" name="username" value="<?php echo e($me['username']); ?>" required>
                 <div class="form-text">You'll use this to log in.</div>
-                <button type="submit" class="btn btn-primary mt-3">Change username</button>
+                <button type="submit" class="btn btn-library mt-3">Change username</button>
               </form>
             </div>
           </section>
 
           <!-- Password -->
-          <section class="card mb-4">
+          <section class="card shadow-sm border-0 mb-4">
             <div class="card-body">
               <h2 class="h5 card-title mb-3">Password</h2>
               <form method="post" action="account.php">
@@ -292,7 +270,7 @@ $token = e($_SESSION['csrf_token']);
                   <label for="confirm_password" class="form-label">Confirm new password</label>
                   <input type="password" class="form-control" id="confirm_password" name="confirm_password" autocomplete="new-password" minlength="<?php echo $MIN_PASSWORD_LENGTH; ?>" required>
                 </div>
-                <button type="submit" class="btn btn-primary">Change password</button>
+                <button type="submit" class="btn btn-library">Change password</button>
               </form>
             </div>
           </section>

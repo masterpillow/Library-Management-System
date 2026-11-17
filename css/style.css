@@ -1,39 +1,75 @@
 /*
-* Custom Styles for CSC235 Login System
-* Author: Joshua Connor
-* Date: 2026-02-24
-* Version: 1.0
-*/
+ * Library Management System styles
+ * Bootstrap does most of the work; this file only adds the brand color,
+ * the font, and a footer that stays at the bottom without covering content.
+ */
 
-/* Google Fonts Incorporated */
-/* Additional weights and styles can be added as needed */
-/*
-.roboto-flex {
-  font-family: "Roboto Flex", sans-serif;
-  font-optical-sizing: auto;
-  font-weight: <weight>;
-  font-style: normal;
-  font-variation-settings:
-    "slnt" 0,
-    "wdth" 100,
-    "GRAD" 0,
-    "XOPQ" 96,
-    "XTRA" 468,
-    "YOPQ" 79,
-    "YTAS" 750,
-    "YTDE" -203,
-    "YTFI" 738,
-    "YTLC" 514,
-    "YTUC" 712;
-} */
+:root {
+  --library-green: #1f4d3a;
+  --library-green-dark: #173a2c;
+}
 
 html,
 body {
-  font-family: "Roboto Flex", sans-serif;
-  font-optical-sizing: auto;
-  font-weight: 300;
-  font-style: normal;
-  margin: 0;
-  padding: 0;
-  background-color: #f4f4f4;
+  font-family: "Roboto Flex", system-ui, sans-serif;
+  background-color: #f5f6f4;
+}
+
+/* Footer sits after the content and is pushed to the bottom on short pages */
+body {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+body > main {
+  flex: 1 0 auto;
+}
+
+.bg-library {
+  background-color: var(--library-green);
+}
+.navbar .nav-link.active {
+  font-weight: 600;
+}
+.navbar .nav-link,
+.navbar .navbar-text,
+.navbar .btn {
+  white-space: nowrap;
+}
+
+.btn-library {
+  --bs-btn-color: #fff;
+  --bs-btn-bg: var(--library-green);
+  --bs-btn-border-color: var(--library-green);
+  --bs-btn-hover-color: #fff;
+  --bs-btn-hover-bg: var(--library-green-dark);
+  --bs-btn-hover-border-color: var(--library-green-dark);
+}
+
+.page-header {
+  margin-bottom: 1.5rem;
+}
+.page-header h1 {
+  font-weight: 600;
+}
+
+.stat-card .stat-value {
+  font-size: 2rem;
+  font-weight: 600;
+}
+
+.table td,
+.table th {
+  vertical-align: middle;
+}
+
+/* Login, signup and password pages */
+.auth-card {
+  max-width: 440px;
+}
+
+.nav-pills {
+  --bs-nav-pills-link-active-bg: var(--library-green);
+  --bs-nav-link-color: var(--library-green);
+  --bs-nav-link-hover-color: var(--library-green-dark);
 }

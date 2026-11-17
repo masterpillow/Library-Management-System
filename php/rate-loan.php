@@ -1,23 +1,34 @@
 <?php
-require_once 'session.php';
-require_once 'path.php';
-require_once 'config.php';
+//======================================================================
+// MEMBER: rate a book they have borrowed (1 to 5, one rating per book)
+//======================================================================
+include_once (__DIR__ . '/session.php');
+require_role(ROLE_MEMBER);
+require_post('user/loans.php');
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $loan_id = (int) ($_POST['loan_id'] ?? 0);
-    $rating = (int) ($_POST['rating'] ?? 0);
-    $user_id = (int) ($_SESSION['user_id'] ?? 0);
+$book_id = (int)(isset($_POST['book_id']) ? $_POST['book_id'] : 0);
+$rating = (int)(isset($_POST['rating']) ? $_POST['rating'] : 0);
 
-    // Validate rating range (1 to 5) and ensure IDs are valid
-    if ($rating >= 1 && $rating <= 5 && $loan_id > 0 && $user_id > 0) {
-        // Secure update: verify the loan belongs to this specific user before updating
-        $stmt = $db_connection->prepare("UPDATE Loans SET rating = ? WHERE loan_id = ? AND user_id = ?");
-        $stmt->bind_param("iii", $rating, $loan_id, $user_id);
-        $stmt->execute();
-        $stmt->close();
-    }
+// Only books this member has actually borrowed
+$q = $db_connection->prepare("SELECT b.title FROM Loans l
+                              JOIN Copies c ON c.copy_id = l.copy_id
+                              JOIN Books b ON b.book_id = c.book_id
+                              WHERE l.user_id = ? AND c.book_id = ? LIMIT 1");
+$q->bind_param('ii', $user_id, $book_id);
+$q->execute();
+$book = $q->get_result()->fetch_assoc();
+$q->close();
+
+if (!$book) {
+  flash('warning', 'You can only rate books you have borrowed.');
+} elseif ($rating < 1 || $rating > 5) {
+  flash('warning', 'Pick a rating from 1 to 5.');
+} else {
+  $s = $db_connection->prepare("INSERT INTO Ratings (user_id, book_id, rating) VALUES (?, ?, ?)
+                                ON DUPLICATE KEY UPDATE rating = VALUES(rating)");
+  $s->bind_param('iii', $user_id, $book_id, $rating);
+  $s->execute();
+  $s->close();
+  flash('success', 'You rated "' . $book['title'] . '" ' . $rating . ' out of 5.');
 }
-
-// Redirect back to the loans account page with a success flag
-header("Location: my_loans.php?msg=rating_success");
-exit;
+redirect('user/loans.php');

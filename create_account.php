@@ -1,80 +1,61 @@
 <?php
-/**
- * create account Page
- *
- * @author    Joshua Connor <connorj4@southernct.edu>
- * @copyright 2026 
- * @date      2026-02-24
- * @version   1.0
- */
+//======================================================================
+// CREATE ACCOUNT PAGE: anyone can sign up and becomes a library member
+//======================================================================
+include_once (realpath(dirname(__FILE__) . '/php/helpers.php'));
 
-  /* Start The Session */
-  session_start(); 
+$page_name = 'signup';
+$page_title = 'Create Account';
 
+// Values from a form that had an error, so nothing has to be retyped
+$old = isset($_SESSION['signup_old']) ? $_SESSION['signup_old'] : [];
+unset($_SESSION['signup_old']);
+$v = function ($k) use ($old) { return isset($old[$k]) ? e($old[$k]) : ''; };
 ?>
 <!doctype html>
 <html lang="en">
-  <head>
-    <?php include_once "./include/head.php"; ?>
-  </head>
-  <body>
-    <?php include_once "./include/header.php"; ?>
-    <main role="main" class="container">
-      <div class="row justify-content-sm-center">
-        <div class="col-sm-4">
-          <h1>Create Account</h1>
-          <form action="./php/create_account.php" method="post">
-            <div class="input-group mb-3">
-              <input type="text" class="form-control" id="first_name" placeholder="Enter First Name" name="first_name" required>
-            </div>
-            <div class="input-group mb-3">
-              <input type="text" class="form-control" id="last_name" placeholder="Enter Last Name" name="last_name" required>
-            </div>
-            <div class="input-group mb-3">
-              <input type="email" class="form-control" id="email" placeholder="Enter Email Address" name="email" required>
-            </div>
-            <div class="input-group mb-3">
-              <input type="tel" class="form-control" id="phone" placeholder="Enter Phone Number" name="phone" required>
-            </div>
-            <div class="input-group mb-3">
-              <input type="text" class="form-control" id="username" aria-describedby="username" placeholder="Enter username" name="username" required>
-            </div>
-            <div class="input-group mb-3">
-              <input type="password" class="form-control" id="exampleInputPassword1" placeholder="Password" name="password" required>
-            </div>
-            <div class="input-group mb-3">
-              <input type="text" class="form-control" id="street" placeholder="Enter Street Address" name="street" >
-            </div>
-            <div class="input-group mb-3">
-              <input type="text" class="form-control" id="street_additional" placeholder="Enter Street Additional" name="street_additional">
-            </div>
-            <div class="input-group mb-3">
-              <input type="text" class="form-control" id="city" placeholder="Enter City" name="city" >
-            </div>
-            <div class="input-group mb-3">
-              <input type="text" class="form-control" id="state" placeholder="Enter State" name="state" >
-            </div>
-            <div class="input-group mb-3">
-              <input type="text" class="form-control" id="zip" placeholder="Enter Zip Code" name="zip" >
-            </div>
-            <?php
-              /* Error Message */
-              if (isset($error)) {
-                // uses bootstrap alert style for error messages
-                echo '<div class="alert alert-danger" role="alert">' . $error . '</div>';
-              }
-            ?>
-            <button type="submit" class="btn btn-primary">Create</button>
-          </form>
-          <hr />
-          <p class="text-center">
-              <small>
-                <a href="./index.php">Login</a> | <a href="./forgot_pass.php">Forgot Password</a>
-              </small>
-          </p>
-        </div>
-      </div>
-    </main>
-    <?php include_once "./include/footer.php"; ?>
-  </body>
+<head>
+  <?php include_once (ROOT_PATH . '/include/head.php'); ?>
+</head>
+<body>
+  <?php include_once (ROOT_PATH . '/include/header.php'); ?>
+  <main class="container">
+    <div class="mx-auto" style="max-width: 640px;">
+      <?php show_flashes(); ?>
+      <div class="card shadow-sm border-0"><div class="card-body p-4">
+        <h1 class="h3 mb-1">Create an account</h1>
+        <p class="text-secondary">New accounts are library members with a Standard membership.</p>
+        <form action="php/create_account.php" method="post" class="row g-3">
+          <?php echo csrf_field(); ?>
+          <div class="col-sm-6"><label class="form-label" for="first_name">First name</label>
+            <input type="text" class="form-control" id="first_name" name="first_name" value="<?php echo $v('first_name'); ?>" required></div>
+          <div class="col-sm-6"><label class="form-label" for="last_name">Last name</label>
+            <input type="text" class="form-control" id="last_name" name="last_name" value="<?php echo $v('last_name'); ?>" required></div>
+          <div class="col-sm-6"><label class="form-label" for="email">Email</label>
+            <input type="email" class="form-control" id="email" name="email" value="<?php echo $v('email'); ?>" required></div>
+          <div class="col-sm-6"><label class="form-label" for="phone">Phone</label>
+            <input type="tel" class="form-control" id="phone" name="phone" value="<?php echo $v('phone'); ?>" required></div>
+          <div class="col-sm-6"><label class="form-label" for="username">Username</label>
+            <input type="text" class="form-control" id="username" name="username" value="<?php echo $v('username'); ?>" autocomplete="username" required>
+            <div class="form-text">3 to 50 letters, numbers, dots, dashes, or underscores.</div></div>
+          <div class="col-sm-6"><label class="form-label" for="password">Password</label>
+            <input type="password" class="form-control" id="password" name="password" autocomplete="new-password" minlength="<?php echo MIN_PASSWORD_LENGTH; ?>" required>
+            <div class="form-text">At least <?php echo MIN_PASSWORD_LENGTH; ?> characters.</div></div>
+          <div class="col-12"><label class="form-label" for="street">Street address <span class="text-secondary">(optional)</span></label>
+            <input type="text" class="form-control" id="street" name="street" value="<?php echo $v('street'); ?>"></div>
+          <div class="col-sm-6"><label class="form-label" for="city">City</label>
+            <input type="text" class="form-control" id="city" name="city" value="<?php echo $v('city'); ?>"></div>
+          <div class="col-sm-3"><label class="form-label" for="state">State</label>
+            <input type="text" class="form-control" id="state" name="state" value="<?php echo $v('state'); ?>"></div>
+          <div class="col-sm-3"><label class="form-label" for="zip">Zip</label>
+            <input type="text" class="form-control" id="zip" name="zip" value="<?php echo $v('zip'); ?>"></div>
+          <div class="col-12 d-grid"><button type="submit" class="btn btn-library">Create account</button></div>
+        </form>
+        <hr>
+        <p class="text-center mb-0 small">Already have an account? <a href="index.php">Log in</a></p>
+      </div></div>
+    </div>
+  </main>
+  <?php include_once (ROOT_PATH . '/include/footer.php'); ?>
+</body>
 </html>
