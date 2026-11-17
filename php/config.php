@@ -14,7 +14,7 @@ error_reporting(E_ALL);
 // Author: Joshua Connor - Added new validation logic (2026-02-24)
 // The database login itself is in php/db_credentials.php.
 
-include_once (ROOT_PATH.'/php/path.php');
+include_once (__DIR__ . '/path.php');
 
 /* Important - Comment Error Reporting Section out before going live!!!  */
 error_reporting(E_ALL);

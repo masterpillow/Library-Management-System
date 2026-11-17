@@ -1,25 +1,7 @@
 <?php
 //======================================================================
-// ERROR AND MESSAGE REPORTS
+// MESSAGES: kept for older pages that include this file.
+// New pages call show_flashes() directly.
 //======================================================================
-
-  /* Error Report */
-  if (isset($error)) {
-    // uses bootstrap alert style for error messages
-    echo '<div class="alert alert-danger" role="alert">' . $error . '</div>';
-  }
-  if (isset($_SESSION['error'])) {
-    echo '<div class="alert alert-danger" role="alert">' . htmlspecialchars($_SESSION['error']) . '</div>';
-    unset($_SESSION['error']); // show it once
-  }
-  /* Message Report */
-  if (isset($message)) {
-    // uses bootstrap alert style for error messages
-    echo '<div class="alert alert-warning" role="warning">' . $message . '</div>';
-  }
-  if (isset($_SESSION['message'])) {
-    // uses bootstrap alert style for error messages
-    echo '<div class="alert alert-warning" role="warning">' . htmlspecialchars($_SESSION['message']) . '</div>';
-    unset($_SESSION['message']); // show it once
-  }
-?>
+include_once (__DIR__ . '/helpers.php');
+show_flashes();
