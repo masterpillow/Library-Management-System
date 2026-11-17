@@ -12,25 +12,24 @@
 // Include necessary configuration and path files
 include_once (realpath(dirname(__FILE__).'/path.php'));
 include_once (realpath(dirname(__FILE__).'/config.php'));
-
-session_start();
+include_once (realpath(dirname(__FILE__).'/helpers.php')); // starts the session
 
 //-----------------------------------------------------
 // Authenticate
 //-----------------------------------------------------
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
   // Direct access without POST data
-  header("location: " . SRC_PATH . "/logout.php");
-  exit();
+  redirect('index.php');
 }
+
+csrf_check('index.php');
 
 $username = isset($_POST['username']) ? trim($_POST['username']) : '';
 $password = isset($_POST['password']) ? $_POST['password'] : '';
 
 if ($username === '' || $password === '') {
-  $_SESSION['message'] = "Username or Password is empty!";
-  header("location: " . BASE_URL . "/index.php");
-  exit();
+  flash('warning', 'Enter your username and password.');
+  redirect('index.php');
 }
 
 // Look the user up by username only, then check the password against the stored hash.
@@ -54,21 +53,10 @@ if ($found && password_verify($password, $password_hash)) {
   $_SESSION['login_user'] = $db_username;
   $_SESSION['user_role'] = $user_role;
 
-  // Redirect based on user role
-  if ($user_role == 1) {
-    header("location: " . BASE_URL . "/admin");
-  } elseif ($user_role == 2) {
-    header("location: " . BASE_URL . "/user/index.php");
-  } elseif ($user_role == 3) {
-    header("location: " . BASE_URL . "/guest");
-  } else {
-    $_SESSION['error'] = "Login Failed";
-    header("location: " . BASE_URL . "/index.php");
-  }
-  exit();
+  // Each role has its own home page
+  redirect(home_for_role($user_role));
 }
 
 // Invalid login: same message whether the username or the password was wrong
-$_SESSION['message'] = "Username or Password did not match!";
-header("location: " . BASE_URL . "/index.php");
-exit();
+flash('danger', 'That username and password don\'t match an active account.');
+redirect('index.php');

@@ -1,80 +1,96 @@
 <?php
-ini_set('display_errors', 1);
-error_reporting(E_ALL);
+//======================================================================
+// RESET PASSWORD: set a new password from an emailed link
+//======================================================================
+include_once (__DIR__ . '/config.php');
+include_once (__DIR__ . '/helpers.php');
 
-include_once(realpath(dirname(__FILE__) . '/path.php'));
-include_once(ROOT_SRC_PATH . '/config.php');
+$page_name = 'forgot';
+$page_title = 'Reset Password';
 
-$message = '';
-$token = $_GET['token'] ?? '';
+$token = isset($_POST['token']) ? $_POST['token'] : (isset($_GET['token']) ? $_GET['token'] : '');
+$token = is_string($token) ? $token : '';
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $token = $_POST['token'] ?? '';
-    $new_password = $_POST['password'] ?? '';
-    $confirm = $_POST['confirm'] ?? '';
+/* Find an unused, unexpired reset for this token */
+function find_reset(mysqli $db, $token) {
+  if (!preg_match('/^[a-f0-9]{64}$/', $token)) {
+    return null;
+  }
+  $hash = hash('sha256', $token);
+  $s = $db->prepare("SELECT reset_id, user_id FROM Password_Resets
+                     WHERE token_hash = ? AND used_at IS NULL AND expires_at > NOW() LIMIT 1");
+  $s->bind_param('s', $hash);
+  $s->execute();
+  $row = $s->get_result()->fetch_assoc();
+  $s->close();
+  return $row;
+}
 
-    if ($new_password !== $confirm) {
-        $message = "Passwords do not match.";
-    } elseif (strlen($new_password) < 6) {
-        $message = "Password must be at least 6 characters.";
-    } else {
-        $stmt = $db_connection->prepare("
-            SELECT pr.reset_id, pr.user_id, pr.token_hash
-            FROM Password_Resets pr
-            WHERE pr.expires_at > NOW() AND pr.used_at IS NULL
-        ");
-        $stmt->execute();
-        $resets = $stmt->get_result();
+$reset = find_reset($db_connection, $token);
 
-        $valid = null;
-        while ($row = $resets->fetch_assoc()) {
-            if (password_verify($token, $row['token_hash'])) {
-                $valid = $row;
-                break;
-            }
-        }
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $reset) {
+  csrf_check('php/reset.php?token=' . urlencode($token));
+  $new = isset($_POST['password']) ? $_POST['password'] : '';
+  $confirm = isset($_POST['confirm']) ? $_POST['confirm'] : '';
 
-        if ($valid) {
-            $hash = password_hash($new_password, PASSWORD_DEFAULT);
-            $upd = $db_connection->prepare("UPDATE Credentials SET password_hash = ? WHERE user_id = ?");
-            $upd->bind_param('si', $hash, $valid['user_id']);
-            $upd->execute();
+  if (strlen($new) < MIN_PASSWORD_LENGTH) {
+    flash('danger', 'Your new password must be at least ' . MIN_PASSWORD_LENGTH . ' characters.');
+  } elseif ($new !== $confirm) {
+    flash('danger', 'The passwords do not match.');
+  } else {
+    $db_connection->begin_transaction();
+    $hash = password_hash($new, PASSWORD_DEFAULT);
+    $u = $db_connection->prepare("UPDATE Credentials SET password_hash = ? WHERE user_id = ?");
+    $u->bind_param('si', $hash, $reset['user_id']);
+    $u->execute();
+    $u->close();
+    // This link and any other open links for the account stop working
+    $m = $db_connection->prepare("UPDATE Password_Resets SET used_at = NOW() WHERE user_id = ? AND used_at IS NULL");
+    $m->bind_param('i', $reset['user_id']);
+    $m->execute();
+    $m->close();
+    $db_connection->commit();
 
-            $mark = $db_connection->prepare("UPDATE Password_Resets SET used_at = NOW() WHERE reset_id = ?");
-            $mark->bind_param('i', $valid['reset_id']);
-            $mark->execute();
-
-            $message = "Password updated! <a href='../index.php'>Log in</a>";
-        } else {
-            $message = "Invalid or expired reset link.";
-        }
-    }
+    flash('success', 'Your password was changed. Log in with your new password.');
+    redirect('index.php');
+  }
+  redirect('php/reset.php?token=' . urlencode($token));
 }
 ?>
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <title>Reset Password</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <?php include_once (ROOT_PATH . '/include/head.php'); ?>
 </head>
-<body class="container py-5">
-  <h1>Reset Password</h1>
-  <?php if ($message) echo "<div class='alert alert-info'>$message</div>"; ?>
-
-  <?php if (!$message || strpos($message, 'updated') === false): ?>
-  <form method="post">
-    <input type="hidden" name="token" value="<?= htmlspecialchars($token) ?>">
-    <div class="mb-3">
-      <label>New Password</label>
-      <input type="password" name="password" class="form-control" required>
+<body>
+  <?php include_once (ROOT_PATH . '/include/header.php'); ?>
+  <main class="container">
+    <div class="auth-card mx-auto">
+      <?php show_flashes(); ?>
+      <div class="card shadow-sm border-0"><div class="card-body p-4">
+        <h1 class="h3 mb-3">Choose a new password</h1>
+        <?php if (!$reset): ?>
+          <p>This reset link is invalid, already used, or expired.</p>
+          <a href="<?php echo e(url('forgot_pass.php')); ?>" class="btn btn-library">Request a new link</a>
+        <?php else: ?>
+          <form method="post" action="<?php echo e(url('php/reset.php')); ?>">
+            <?php echo csrf_field(); ?>
+            <input type="hidden" name="token" value="<?php echo e($token); ?>">
+            <div class="mb-3">
+              <label for="password" class="form-label">New password</label>
+              <input type="password" class="form-control" id="password" name="password" autocomplete="new-password" minlength="<?php echo MIN_PASSWORD_LENGTH; ?>" required>
+              <div class="form-text">At least <?php echo MIN_PASSWORD_LENGTH; ?> characters.</div>
+            </div>
+            <div class="mb-3">
+              <label for="confirm" class="form-label">Confirm new password</label>
+              <input type="password" class="form-control" id="confirm" name="confirm" autocomplete="new-password" minlength="<?php echo MIN_PASSWORD_LENGTH; ?>" required>
+            </div>
+            <div class="d-grid"><button type="submit" class="btn btn-library">Change password</button></div>
+          </form>
+        <?php endif; ?>
+      </div></div>
     </div>
-    <div class="mb-3">
-      <label>Confirm Password</label>
-      <input type="password" name="confirm" class="form-control" required>
-    </div>
-    <button type="submit" class="btn btn-primary">Update Password</button>
-  </form>
-  <?php endif; ?>
+  </main>
+  <?php include_once (ROOT_PATH . '/include/footer.php'); ?>
 </body>
 </html>

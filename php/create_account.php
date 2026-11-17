@@ -1,107 +1,72 @@
 <?php
 //======================================================================
-// Create Account
+// CREATE ACCOUNT: handles the sign-up form
 //======================================================================
+// New accounts are members (role 2) with the default membership.
 
-include_once (realpath(dirname(__FILE__).'/path.php'));
-include_once (realpath(dirname(__FILE__).'/config.php'));
+include_once (__DIR__ . '/config.php');
+include_once (__DIR__ . '/helpers.php');
 
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    // collect value of input field
-    $first_name = $_POST['first_name'];
-    $last_name = $_POST['last_name'];
-    $email = $_POST['email'];
-    $phone = $_POST['phone'];
-    $username = $_POST['username'];
-    $password = $_POST['password'];
-    $street = $_POST['street'];
-    $street_additional = $_POST['street_additional'];
-    $city = $_POST['city'];
-    $state_code = $_POST['state'];
-    $post_code = $_POST['zip'];
+require_post('create_account.php');
 
-    if (empty($first_name) || empty($last_name) || empty($email) || empty($phone) || empty($username) || empty($password) ) {
-        echo "All fields are required.";
-        exit();
-    }
+$f = [];
+foreach (['first_name', 'last_name', 'email', 'phone', 'username', 'street', 'city', 'state', 'zip'] as $k) {
+  $f[$k] = trim(isset($_POST[$k]) ? $_POST[$k] : '');
+}
+$password = isset($_POST['password']) ? $_POST['password'] : '';
 
-    // Check if username already exists
-    $check_user = $db_connection->prepare(
-        "SELECT u.user_id 
-        FROM Users u 
-        INNER JOIN Credentials c 
-        ON u.user_id = c.user_id 
-        WHERE c.username = ?");
-    $check_user->bind_param("s", $username);
-    $check_user->execute();
-    $check_user->store_result();
-
-    if ($check_user->num_rows > 0) {
-        echo "Username already exists. Please choose a different username.";
-        $check_user->close();
-        exit();
-    }
-    $check_user->close();
-
-    // Insert into Contacts table
-    $insert_contact = $db_connection->prepare("INSERT INTO Contacts (first_name, last_name, email, phone, street_1, street_2, city, state_code, post_code) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
-    $insert_contact->bind_param("sssssssss", $first_name, $last_name, $email, $phone, $street, $street_additional, $city, $state_code, $post_code);
-    
-    if ($insert_contact->execute()) {
-        // Get the contact_id of the newly inserted contact
-        $contact_id = $insert_contact->insert_id;
-        $insert_contact->close();
-
-        // Insert into Users table with default role_id = 2 (user)
-        // membership_id defaults to 1 (Standard) in the database
-        $role_id = 2; // Default role_id for regular users
-        $insert_user = $db_connection->prepare("INSERT INTO Users (contact_id, role_id) VALUES (?, ?)");
-        $insert_user->bind_param("ii", $contact_id, $role_id);
-        
-        if ($insert_user->execute()) {
-            // Get the user_id of the newly inserted user
-            $user_id = $insert_user->insert_id;
-            $insert_user->close();
-
-            // Insert into Credentials table with hashed password
-            // bcrypt hash with a random salt per password
-            $password_hash = password_hash($password, PASSWORD_DEFAULT);
-            $insert_credential = $db_connection->prepare("INSERT INTO Credentials (user_id, username, password_hash) VALUES (?, ?, ?)");
-            $insert_credential->bind_param("iss", $user_id, $username, $password_hash);
-
-            if ($insert_credential->execute()) {
-                $insert_credential->close();
-                echo "Account created successfully! You will be redirected to the login page in <span id='countdown'>5</span> seconds...";
-                echo "<br><a href='" . BASE_URL . "/index.php'>Click here to login now</a>";
-                echo "<script>
-                        let timeLeft = 5;
-                        const countdown = document.getElementById('countdown');
-                        
-                        const timer = setInterval(function() {
-                            timeLeft--;
-                            countdown.textContent = timeLeft;
-                            
-                            if (timeLeft <= 0) {
-                                clearInterval(timer);
-                                window.location.href = '" . BASE_URL . "/index.php';
-                            }
-                        }, 1000);
-                      </script>";
-            } else {
-                echo "Error creating credentials: " . $db_connection->error;
-            }
-        } else {
-            echo "Error creating user: " . $db_connection->error;
-        }
-    } else {
-        echo "Error creating contact: " . $db_connection->error;
-    }   
-    $db_connection->close();
-} else {
-    echo "Invalid request method.";
+/* Send them back to the form with their values and a message */
+function fail($text, $f) {
+  $_SESSION['signup_old'] = $f;
+  flash('danger', $text);
+  redirect('create_account.php');
 }
 
-exit();
+if ($f['first_name'] === '' || $f['last_name'] === '' || $f['email'] === '' || $f['phone'] === '' || $f['username'] === '') {
+  fail('First name, last name, email, phone, and username are required.', $f);
+}
+if (!filter_var($f['email'], FILTER_VALIDATE_EMAIL)) {
+  fail('Please enter a valid email address.', $f);
+}
+if (!preg_match('/^[A-Za-z0-9._-]{3,50}$/', $f['username'])) {
+  fail('Usernames are 3 to 50 characters: letters, numbers, dots, dashes, or underscores.', $f);
+}
+if (strlen($password) < MIN_PASSWORD_LENGTH) {
+  fail('Your password must be at least ' . MIN_PASSWORD_LENGTH . ' characters.', $f);
+}
 
+$db_connection->begin_transaction();
+try {
+  $c = $db_connection->prepare("INSERT INTO Contacts (first_name, last_name, email, phone, street_1, city, state_code, post_code)
+                                VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+  $c->bind_param('ssssssss', $f['first_name'], $f['last_name'], $f['email'], $f['phone'], $f['street'], $f['city'], $f['state'], $f['zip']);
+  $c->execute();
+  $contact_id = $c->insert_id;
+  $c->close();
 
-?>
+  $role = ROLE_MEMBER;
+  $u = $db_connection->prepare("INSERT INTO Users (role_id, contact_id) VALUES (?, ?)");
+  $u->bind_param('ii', $role, $contact_id);
+  $u->execute();
+  $new_id = $u->insert_id;
+  $u->close();
+
+  $hash = password_hash($password, PASSWORD_DEFAULT);
+  $cr = $db_connection->prepare("INSERT INTO Credentials (username, user_id, password_hash) VALUES (?, ?, ?)");
+  $cr->bind_param('sis', $f['username'], $new_id, $hash);
+  $cr->execute();
+  $cr->close();
+
+  $db_connection->commit();
+} catch (mysqli_sql_exception $ex) {
+  $db_connection->rollback();
+  if ($ex->getCode() == 1062) {
+    fail(stripos($ex->getMessage(), 'email') !== false
+      ? 'An account with that email already exists. Try logging in or resetting your password.'
+      : 'That username is taken. Please choose another.', $f);
+  }
+  fail('Your account could not be created. Please try again.', $f);
+}
+
+flash('success', 'Welcome, ' . $f['first_name'] . '! Your account is ready. Log in to get started.');
+redirect('index.php');

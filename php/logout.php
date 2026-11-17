@@ -1,14 +1,11 @@
 <?php
 //======================================================================
-// LOGOUT
+// LOGOUT: end the session and go back to the login page
 //======================================================================
+include_once (__DIR__ . '/helpers.php'); // starts the session
 
-include_once (realpath(dirname(__FILE__).'/path.php'));
-
+$_SESSION = [];
+session_destroy();
 session_start();
-   
-if(session_destroy()) {
-  header("Location: " . BASE_URL);
-}
-
-?>
+flash('success', 'You have been logged out.');
+redirect('index.php');
