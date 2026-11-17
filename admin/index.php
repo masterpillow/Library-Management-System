@@ -1,115 +1,105 @@
 <?php
-/**
- * Admin Index Page
- *
- * @author    Joshua Connor <connorj4@southernct.edu>
- * @copyright 2026 
- * @date      2026-02-24
- * @version   1.0
- */
+//======================================================================
+// ADMIN DASHBOARD
+//======================================================================
+include_once (realpath(dirname(__FILE__, 2) . '/php/session.php'));
+require_role(ROLE_ADMIN);
 
-error_reporting(E_ALL);
-ini_set('display_errors', 0); // set to 1 to display errors, 0 to hide them
+$page_name = 'admin';
+$page_title = 'Admin Dashboard';
 
-  /* Quick Paths */
-  /* note the 2 after __FILE__, because it's 2 directories deep */
-  include_once (realpath(dirname(__FILE__, 2).'/php/session.php'));
-  include_once (realpath(dirname(__FILE__, 2).'/php/path.php'));
-  // Session will be included in header.php
-  
-  /* Check Role */
-  include_once (ROOT_SRC_PATH .'/check_admin.php');
+expire_old_holds($db_connection);
 
-  /* Page Name */
-  $page_name = "admin";
+$stats = $db_connection->query(
+  "SELECT
+     (SELECT COUNT(*) FROM Books WHERE is_active = 1) AS books,
+     (SELECT COUNT(*) FROM Copies WHERE status IN ('available', 'on_loan', 'on_hold')) AS copies,
+     (SELECT COUNT(*) FROM Copies WHERE status = 'available') AS on_shelf,
+     (SELECT COUNT(*) FROM Loans WHERE return_date IS NULL) AS loans_out,
+     (SELECT COUNT(*) FROM Loans WHERE return_date IS NULL AND DATEDIFF(NOW(), due_date) > 0) AS overdue,
+     (SELECT COUNT(*) FROM Holds WHERE status = 'waiting') AS holds_waiting,
+     (SELECT COUNT(*) FROM Holds WHERE status = 'ready') AS holds_ready,
+     (SELECT COUNT(*) FROM Users WHERE role_id = " . ROLE_MEMBER . " AND is_active = 1) AS members,
+     (SELECT COALESCE(SUM(fine), 0) FROM Loans) AS fines")->fetch_assoc();
 
+$overdue = $db_connection->query(
+  "SELECT b.title, c.barcode, co.first_name, co.last_name, l.due_date, " . DAYS_LATE_SQL . " AS days_late
+   FROM Loans l
+   JOIN Copies c ON c.copy_id = l.copy_id
+   JOIN Books b ON b.book_id = c.book_id
+   JOIN Users u ON u.user_id = l.user_id
+   JOIN Contacts co ON co.contact_id = u.contact_id
+   WHERE l.return_date IS NULL AND DATEDIFF(NOW(), l.due_date) > 0
+   ORDER BY l.due_date
+   LIMIT 10")->fetch_all(MYSQLI_ASSOC);
+
+$cards = [
+  ['Active books',        $stats['books'],                                  'book',              'books.php'],
+  ['Copies on the shelf', $stats['on_shelf'] . ' / ' . $stats['copies'],   'upc-scan',          'copies.php'],
+  ['Books checked out',   $stats['loans_out'],                              'journal-arrow-up',  'returns.php'],
+  ['Overdue',             $stats['overdue'],                                'exclamation-octagon','returns.php'],
+  ['Holds waiting',       $stats['holds_waiting'],                          'hourglass-split',   null],
+  ['Holds ready for pickup', $stats['holds_ready'],                         'bell',              null],
+  ['Active members',      $stats['members'],                                'people',            'members.php'],
+  ['Unpaid fines',        '$' . number_format($stats['fines'], 2),          'cash-coin',         null],
+];
 ?>
 <!doctype html>
 <html lang="en">
-  <head>
+<head>
   <?php include_once (ROOT_PATH . '/include/head.php'); ?>
-  </head>
-  <body class="<?php echo $page_name; ?>">
-
+</head>
+<body>
   <?php include_once (ROOT_PATH . '/include/header.php'); ?>
-    <main role="main" class="container">
+  <main class="container">
+    <?php show_flashes(); ?>
 
-    <div class="container text-center">
-  <div class="row align-items-center">
-    
-    <div class="col">
-      <div class="mb-6">
-      <h1>Welcome <?php echo htmlspecialchars($_SESSION['user_first']) ?></h1>
-      <p class="lead">This is the <?php echo $_SESSION['user_type'] ?> dashboard.</p>
-      <p>Only users with the <?php echo $_SESSION['user_type'] ?> role can access this page.</p>
+    <div class="page-header">
+      <h1>Welcome, <?php echo e($_SESSION['user_first']); ?></h1>
+      <p class="text-secondary mb-0">Here's where the library stands today.</p>
+    </div>
+
+    <div class="row g-3 mb-4">
+      <?php foreach ($cards as $c): ?>
+        <div class="col-6 col-lg-3">
+          <?php if ($c[3]): ?><a class="text-decoration-none" href="<?php echo e($c[3]); ?>"><?php endif; ?>
+          <div class="card stat-card h-100 shadow-sm border-0"><div class="card-body">
+            <div class="text-secondary small"><i class="bi bi-<?php echo $c[2]; ?> me-1"></i><?php echo e($c[0]); ?></div>
+            <div class="stat-value text-body"><?php echo e($c[1]); ?></div>
+          </div></div>
+          <?php if ($c[3]): ?></a><?php endif; ?>
+        </div>
+      <?php endforeach; ?>
+    </div>
+
+    <section class="mb-4">
+      <div class="d-flex justify-content-between align-items-center">
+        <h2 class="h4 mb-2">Overdue books</h2>
+        <a href="returns.php" class="btn btn-sm btn-library">Process returns</a>
       </div>
-      <hr class="mb-4">
-      <section class="mb-4">
-      <h2>All System Users</h2>
-      <table class="table">
-    <div class="mb-4">
-      <a href="books.php" class="btn btn-primary me-2">Manage Books</a>
-      <a href="copies.php" class="btn btn-primary me-2">Manage Copies</a>
-      <a href="returns.php" class="btn btn-primary me-2">Manage Returns</a>
-      <a href="members.php" class="btn btn-primary me-2">Manage Members</a>
-      <a href="staff-picks.php" class="btn btn-primary">Staff Picks</a>
-    </div>
-  <thead>
-    <tr>
-      <th scope="col">#</th>
-      <th scope="col">First</th>
-      <th scope="col">Last</th>
-      <th scope="col">Email</th>
-      <th scope="col">Username</th>
-      <th scope="col">Role</th>
-    </tr>
-  </thead>
-  <tbody>
-    <?php
-      include_once (ROOT_PATH . '/php/config.php');
-
-      $result = $db_connection->query(
-        "SELECT 
-            u.user_id,
-            c.first_name,
-            c.last_name,
-            c.email,
-            cr.username,
-            r.role_type
-        FROM Users u
-        INNER JOIN Contacts c ON u.contact_id = c.contact_id
-        INNER JOIN Credentials cr ON u.user_id = cr.user_id
-        INNER JOIN Roles r ON u.role_id = r.role_id
-        ORDER BY u.user_id ASC");
-
-      if ($result->num_rows > 0) {
-        // output data of each row
-        while($row = $result->fetch_assoc()) {
-          echo "<tr>";
-          echo "<th scope='row'>" . $row["user_id"] . "</th>";
-          echo "<td>" . htmlspecialchars($row["first_name"]) . "</td>";
-          echo "<td>" . htmlspecialchars($row["last_name"]) . "</td>";
-          echo "<td>" . htmlspecialchars($row["email"]) . "</td>";
-          echo "<td>" . htmlspecialchars($row["username"]) . "</td>";
-          echo "<td>" . htmlspecialchars($row["role_type"]) . "</td>";
-          echo "</tr>";
-        }
-      } else {
-        echo "<tr><td colspan='6'>No users found</td></tr>";
-      }
-      $db_connection->close();
-    ?>
-
-  </tbody>
-</table>
-</section>
-      
-    </div>
-    
-  </div>
-</div>  
-       
-    </main>
-    <?php include_once (ROOT_PATH . '/include/footer.php'); ?>
-  </body>
+      <?php if (!$overdue): ?>
+        <p class="text-secondary">Nothing is overdue.</p>
+      <?php else: ?>
+        <div class="table-responsive bg-white rounded shadow-sm">
+          <table class="table mb-0">
+            <thead class="table-light"><tr><th>Title</th><th>Copy</th><th>Member</th><th>Due</th><th>Fine so far</th></tr></thead>
+            <tbody>
+            <?php foreach ($overdue as $o): ?>
+              <tr>
+                <td class="fw-semibold"><?php echo e($o['title']); ?></td>
+                <td><code><?php echo e($o['barcode']); ?></code></td>
+                <td><?php echo e($o['first_name'] . ' ' . $o['last_name']); ?></td>
+                <td><?php echo e(date('M j, Y', strtotime($o['due_date']))); ?>
+                  <span class="badge text-bg-danger ms-1"><?php echo (int)$o['days_late']; ?> days late</span></td>
+                <td>$<?php echo number_format($o['days_late'] * FINE_PER_DAY, 2); ?></td>
+              </tr>
+            <?php endforeach; ?>
+            </tbody>
+          </table>
+        </div>
+      <?php endif; ?>
+    </section>
+  </main>
+  <?php include_once (ROOT_PATH . '/include/footer.php'); ?>
+</body>
 </html>

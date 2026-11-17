@@ -1,122 +1,133 @@
 <?php
-include_once(realpath(dirname(__FILE__) . '/../php/path.php'));
-include_once(ROOT_SRC_PATH . '/session.php');
-include_once(ROOT_SRC_PATH . '/config.php');
-include_once(ROOT_SRC_PATH . '/check_admin.php');
+//======================================================================
+// ADMIN: staff picks
+//======================================================================
+// A hand-picked list of recommended books with a short blurb. Checkout
+// counts are shown to help choose what's popular.
 
-// Handle adding or removing a staff pick
-if (isset($_POST['save_pick'])) {
-    $book_id = (int)$_POST['book_id'];
-    $user_id = $_SESSION['user_id'] ?? 1; // Fallback to current logged-in admin
-    $review_blurb = trim($_POST['review_blurb']);
-    
-    // Explicitly matching table column order: user_id then book_id
-    $stmt = $db_connection->prepare("INSERT INTO Staff_Picks (user_id, book_id, pick_date, review_blurb) VALUES (?, ?, NOW(), ?) ON DUPLICATE KEY UPDATE review_blurb = ?");
-    $stmt->bind_param('iiss', $user_id, $book_id, $review_blurb, $review_blurb);
-    $stmt->execute();
-    header("Location: staff-picks.php");
-    exit;
+include_once (realpath(dirname(__FILE__, 2) . '/php/session.php'));
+require_role(ROLE_ADMIN);
+
+$page_name = 'staff-picks';
+$page_title = 'Staff Picks';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+  csrf_check('admin/staff-picks.php');
+  $action = isset($_POST['action']) ? $_POST['action'] : '';
+  $book_id = (int)(isset($_POST['book_id']) ? $_POST['book_id'] : 0);
+
+  if ($action === 'save') {
+    $blurb = trim(isset($_POST['review_blurb']) ? $_POST['review_blurb'] : '');
+    if (strlen($blurb) > 500) {
+      flash('danger', 'Keep the blurb under 500 characters.');
+      redirect('admin/staff-picks.php');
+    }
+    $blurb = $blurb === '' ? null : $blurb;
+    // One pick per book: saving again just updates the blurb
+    $s = $db_connection->prepare("INSERT INTO Staff_Picks (user_id, book_id, pick_date, review_blurb) VALUES (?, ?, NOW(), ?)
+                                  ON DUPLICATE KEY UPDATE review_blurb = VALUES(review_blurb)");
+    $s->bind_param('iis', $user_id, $book_id, $blurb);
+    $s->execute();
+    $s->close();
+    flash('success', 'Staff pick saved.');
+  } elseif ($action === 'remove') {
+    $s = $db_connection->prepare("DELETE FROM Staff_Picks WHERE book_id = ?");
+    $s->bind_param('i', $book_id);
+    $s->execute();
+    $s->close();
+    flash('success', 'Removed from staff picks.');
+  }
+  redirect('admin/staff-picks.php');
 }
 
-if (isset($_POST['remove_pick'])) {
-    $pick_id = (int)$_POST['pick_id'];
-    $stmt = $db_connection->prepare("DELETE FROM Staff_Picks WHERE pick_id = ?");
-    $stmt->bind_param('i', $pick_id);
-    $stmt->execute();
-    header("Location: staff-picks.php");
-    exit;
-}
-
-// Fetch all active books and check if they are currently featured
-$books = $db_connection->query("
-  SELECT b.book_id, b.title, sp.pick_id, sp.review_blurb, g.name AS genre,
-         GROUP_CONCAT(CONCAT(a.first_name, ' ', a.last_name) SEPARATOR ', ') AS authors
-  FROM Books b
-  LEFT JOIN Genres g ON b.genre_id = g.genre_id
-  LEFT JOIN Book_Authors ba ON b.book_id = ba.book_id
-  LEFT JOIN Authors a ON ba.author_id = a.author_id
-  LEFT JOIN Staff_Picks sp ON b.book_id = sp.book_id
-  WHERE b.is_active = 1
-  GROUP BY b.book_id
-  ORDER BY sp.pick_date DESC, b.title ASC
-");
+$books = $db_connection->query(
+  "SELECT b.book_id, b.title, g.name AS genre, sp.pick_id, sp.review_blurb, sp.pick_date,
+          GROUP_CONCAT(DISTINCT CONCAT(a.first_name, ' ', a.last_name) SEPARATOR ', ') AS authors,
+          (SELECT COUNT(*) FROM Loans l JOIN Copies c ON c.copy_id = l.copy_id WHERE c.book_id = b.book_id) AS checkouts,
+          (SELECT ROUND(AVG(r.rating), 1) FROM Ratings r WHERE r.book_id = b.book_id) AS avg_rating
+   FROM Books b
+   LEFT JOIN Genres g ON g.genre_id = b.genre_id
+   LEFT JOIN Book_Authors ba ON ba.book_id = b.book_id
+   LEFT JOIN Authors a ON a.author_id = ba.author_id
+   LEFT JOIN Staff_Picks sp ON sp.book_id = b.book_id
+   WHERE b.is_active = 1
+   GROUP BY b.book_id
+   ORDER BY sp.pick_id IS NULL, checkouts DESC, b.title")->fetch_all(MYSQLI_ASSOC);
 ?>
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <title>Manage Staff Picks</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <?php include_once (ROOT_PATH . '/include/head.php'); ?>
 </head>
-<body class="container py-4">
-  <h1 class="mb-4">Manage Staff Picks</h1>
-  <p class="text-muted">Curate featured library titles and add review blurbs for patrons.</p>
+<body>
+  <?php include_once (ROOT_PATH . '/include/header.php'); ?>
+  <main class="container">
+    <?php show_flashes(); ?>
 
-  <table class="table table-striped align-middle">
-    <thead>
-      <tr>
-        <th>Title</th>
-        <th>Authors</th>
-        <th>Review Blurb</th>
-        <th>Status</th>
-        <th>Action</th>
-      </tr>
-    </thead>
-    <tbody>
-    <?php while ($row = $books->fetch_assoc()): ?>
-      <tr>
-        <td><?= htmlspecialchars($row['title']) ?></td>
-        <td><?= htmlspecialchars($row['authors'] ?? 'Unknown') ?></td>
-        <td><?= htmlspecialchars($row['review_blurb'] ?? 'No blurb added.') ?></td>
-        <td>
-          <?php if (!empty($row['pick_id'])): ?>
-            <span class="badge bg-success">Featured Pick</span>
-          <?php else: ?>
-            <span class="badge bg-secondary">Standard</span>
-          <?php endif; ?>
-        </td>
-        <td>
-          <?php if (!empty($row['pick_id'])): ?>
-            <form method="post" style="display:inline">
-              <input type="hidden" name="pick_id" value="<?= $row['pick_id'] ?>">
-              <button type="submit" name="remove_pick" class="btn btn-sm btn-warning">Remove Pick</button>
-            </form>
-          <?php else: ?>
-            <button class="btn btn-sm btn-outline-success" data-bs-toggle="modal" data-bs-target="#pickModal<?= $row['book_id'] ?>">Add Pick</button>
-          <?php endif; ?>
-        </td>
-      </tr>
+    <div class="page-header">
+      <h1>Staff Picks</h1>
+      <p class="text-secondary mb-0">Feature books on the member dashboard and catalog. Checkout counts and ratings help show what's popular.</p>
+    </div>
 
-      <!-- Modal to add review blurb -->
-      <div class="modal fade" id="pickModal<?= $row['book_id'] ?>" tabindex="-1">
-        <div class="modal-dialog">
-          <div class="modal-content">
-            <form method="post">
-              <div class="modal-header">
-                <h5 class="modal-title">Feature Book: <?= htmlspecialchars($row['title']) ?></h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+    <div class="table-responsive bg-white rounded shadow-sm">
+      <table class="table table-hover mb-0">
+        <thead class="table-light"><tr><th>Title</th><th>Checkouts</th><th>Rating</th><th>Blurb</th><th class="text-end">Action</th></tr></thead>
+        <tbody>
+        <?php foreach ($books as $b): ?>
+          <tr>
+            <td>
+              <div class="fw-semibold"><?php echo e($b['title']); ?>
+                <?php if ($b['pick_id']): ?><span class="badge text-bg-warning ms-1"><i class="bi bi-star-fill"></i> Pick</span><?php endif; ?>
               </div>
-              <div class="modal-body">
-                <input type="hidden" name="book_id" value="<?= $row['book_id'] ?>">
-                <div class="mb-3">
-                  <label class="form-label">Review Blurb / Recommendation</label>
-                  <textarea name="review_blurb" class="form-control" rows="3" placeholder="Why should patrons read this?"></textarea>
-                </div>
-              </div>
-              <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="submit" name="save_pick" class="btn btn-primary">Save Staff Pick</button>
-              </div>
-            </form>
-          </div>
-        </div>
+              <small class="text-secondary"><?php echo e($b['authors'] !== null ? $b['authors'] : 'Unknown author'); ?><?php echo $b['genre'] ? ' &middot; ' . e($b['genre']) : ''; ?></small>
+            </td>
+            <td><?php echo (int)$b['checkouts']; ?></td>
+            <td><?php echo $b['avg_rating'] !== null ? '<i class="bi bi-star-fill text-warning"></i> ' . e($b['avg_rating']) : '<span class="text-secondary">None</span>'; ?></td>
+            <td class="small fst-italic text-secondary"><?php echo $b['review_blurb'] !== null ? e($b['review_blurb']) : ''; ?></td>
+            <td class="text-end text-nowrap">
+              <button class="btn btn-sm <?php echo $b['pick_id'] ? 'btn-outline-primary' : 'btn-outline-success'; ?>" type="button"
+                      data-bs-toggle="modal" data-bs-target="#pick<?php echo (int)$b['book_id']; ?>">
+                <?php echo $b['pick_id'] ? 'Edit blurb' : 'Make a pick'; ?>
+              </button>
+              <?php if ($b['pick_id']): ?>
+                <form method="post" class="d-inline" data-confirm="Remove this book from staff picks?">
+                  <?php echo csrf_field(); ?>
+                  <input type="hidden" name="action" value="remove">
+                  <input type="hidden" name="book_id" value="<?php echo (int)$b['book_id']; ?>">
+                  <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
+                </form>
+              <?php endif; ?>
+            </td>
+          </tr>
+        <?php endforeach; ?>
+        </tbody>
+      </table>
+    </div>
+
+    <?php foreach ($books as $b): ?>
+      <div class="modal fade" id="pick<?php echo (int)$b['book_id']; ?>" tabindex="-1" aria-labelledby="pick<?php echo (int)$b['book_id']; ?>Label" aria-hidden="true">
+        <div class="modal-dialog"><div class="modal-content">
+          <form method="post">
+            <div class="modal-header">
+              <h2 class="modal-title h5" id="pick<?php echo (int)$b['book_id']; ?>Label"><?php echo e($b['title']); ?></h2>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <?php echo csrf_field(); ?>
+              <input type="hidden" name="action" value="save">
+              <input type="hidden" name="book_id" value="<?php echo (int)$b['book_id']; ?>">
+              <label class="form-label" for="blurb<?php echo (int)$b['book_id']; ?>">Why should members read it?</label>
+              <textarea class="form-control" id="blurb<?php echo (int)$b['book_id']; ?>" name="review_blurb" rows="3" maxlength="500"><?php echo $b['review_blurb'] !== null ? e($b['review_blurb']) : ''; ?></textarea>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn btn-library">Save pick</button>
+            </div>
+          </form>
+        </div></div>
       </div>
-    <?php endwhile; ?>
-    </tbody>
-  </table>
-  
-  <a href="index.php" class="btn btn-primary mt-3">Back to Admin Home</a>
-
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <?php endforeach; ?>
+  </main>
+  <?php include_once (ROOT_PATH . '/include/footer.php'); ?>
 </body>
 </html>
