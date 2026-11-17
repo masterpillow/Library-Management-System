@@ -2,6 +2,9 @@
 // ======================================================================
 // USER SEARCH CATALOG (Unified Browsing Modes & Search Query Handler)
 // ======================================================================
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
+
 require_once '../php/path.php';
 require_once '../php/session.php';
 require_once '../php/config.php';
@@ -18,34 +21,8 @@ $books = [];
 $error = '';
 
 try {
-    if ($browse_mode === 'staff') {
-        $sql = "SELECT DISTINCT b.*, a.first_name, a.last_name, g.name AS genre_name,
-                       (SELECT copy_id FROM Copies WHERE book_id = b.book_id AND status = 'available' LIMIT 1) AS available_copy_id
-                FROM Books b 
-                LEFT JOIN Book_Authors ba ON b.book_id = ba.book_id 
-                LEFT JOIN authors a ON ba.author_id = a.author_id 
-                LEFT JOIN genres g ON b.genre_id = g.genre_id 
-                WHERE b.is_staff_pick = 1
-                ORDER BY b.title ASC";
-        $stmt = $db_connection->prepare($sql);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $books = $result->fetch_all(MYSQLI_ASSOC);
-        $stmt->close();
-    } elseif ($browse_mode === 'authors') {
-        $sql = "SELECT DISTINCT b.*, a.first_name, a.last_name, g.name AS genre_name,
-                       (SELECT copy_id FROM Copies WHERE book_id = b.book_id AND status = 'available' LIMIT 1) AS available_copy_id
-                FROM Books b 
-                LEFT JOIN Book_Authors ba ON b.book_id = ba.book_id 
-                LEFT JOIN authors a ON ba.author_id = a.author_id 
-                LEFT JOIN genres g ON b.genre_id = g.genre_id 
-                ORDER BY a.last_name ASC, b.title ASC";
-        $stmt = $db_connection->prepare($sql);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $books = $result->fetch_all(MYSQLI_ASSOC);
-        $stmt->close();
-    } elseif (!empty($searchQuery)) {
+    if (!empty($searchQuery)) {
+        // 1. Prioritize text search across all tabs
         $sql = "SELECT DISTINCT b.*, a.first_name, a.last_name, g.name AS genre_name,
                        (SELECT copy_id FROM Copies WHERE book_id = b.book_id AND status = 'available' LIMIT 1) AS available_copy_id
                 FROM Books b 
@@ -60,7 +37,40 @@ try {
         $result = $stmt->get_result();
         $books = $result->fetch_all(MYSQLI_ASSOC);
         $stmt->close();
+
+    } elseif ($browse_mode === 'staff') {
+        // 2. Staff Picks mode
+        $sql = "SELECT DISTINCT b.*, a.first_name, a.last_name, g.name AS genre_name, sp.review_blurb,
+                       (SELECT copy_id FROM Copies WHERE book_id = b.book_id AND status = 'available' LIMIT 1) AS available_copy_id
+                FROM Staff_Picks sp
+                JOIN Books b ON sp.book_id = b.book_id
+                LEFT JOIN Book_Authors ba ON b.book_id = ba.book_id 
+                LEFT JOIN authors a ON ba.author_id = a.author_id 
+                LEFT JOIN genres g ON b.genre_id = g.genre_id 
+                ORDER BY sp.pick_date DESC";
+        $stmt = $db_connection->prepare($sql);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $books = $result->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+
+    } elseif ($browse_mode === 'authors') {
+        // 3. Browse by author mode
+        $sql = "SELECT DISTINCT b.*, a.first_name, a.last_name, g.name AS genre_name,
+                       (SELECT copy_id FROM Copies WHERE book_id = b.book_id AND status = 'available' LIMIT 1) AS available_copy_id
+                FROM Books b 
+                LEFT JOIN Book_Authors ba ON b.book_id = ba.book_id 
+                LEFT JOIN authors a ON ba.author_id = a.author_id 
+                LEFT JOIN genres g ON b.genre_id = g.genre_id 
+                ORDER BY a.last_name ASC, b.title ASC";
+        $stmt = $db_connection->prepare($sql);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $books = $result->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+
     } else {
+        // 4. Default All Books mode
         $sql = "SELECT DISTINCT b.*, a.first_name, a.last_name, g.name AS genre_name,
                        (SELECT copy_id FROM Copies WHERE book_id = b.book_id AND status = 'available' LIMIT 1) AS available_copy_id
                 FROM Books b 
