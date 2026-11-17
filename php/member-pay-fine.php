@@ -1,14 +1,24 @@
 <?php
-require_once 'session.php';
-require_once 'path.php';
-require_once 'config.php';
+//======================================================================
+// MEMBER: pay all outstanding fines (simulated payment for the demo)
+//======================================================================
+include_once (__DIR__ . '/session.php');
+require_role(ROLE_MEMBER);
+require_post('user/loans.php');
 
-$loan_id = (int) ($_GET['loan_id'] ?? 0);
-$user_id = (int) $_SESSION['user_id'];
+$q = $db_connection->prepare("SELECT COALESCE(SUM(fine), 0) AS total FROM Loans WHERE user_id = ? AND fine > 0");
+$q->bind_param('i', $user_id);
+$q->execute();
+$total = (float)$q->get_result()->fetch_assoc()['total'];
+$q->close();
 
-// Clear the fine for this specific loan, ensuring it belongs to the logged-in user
-$db_connection->query("UPDATE Loans SET fine = 0.00 WHERE loan_id = $loan_id AND user_id = $user_id");
-
-// Redirect back to account page with a success message
-header("Location: /Library-Management-System/php/my_loans.php?msg=fine_paid");
-exit;
+if ($total > 0) {
+  $u = $db_connection->prepare("UPDATE Loans SET fine = 0.00 WHERE user_id = ? AND fine > 0");
+  $u->bind_param('i', $user_id);
+  $u->execute();
+  $u->close();
+  flash('success', 'Payment of $' . number_format($total, 2) . ' received. Thank you!');
+} else {
+  flash('info', 'You have no fines to pay.');
+}
+redirect('user/loans.php');
