@@ -158,7 +158,7 @@ $tables = [
     status varchar(20) NOT NULL DEFAULT 'available',
     PRIMARY KEY(copy_id),
     UNIQUE(barcode),
-    CHECK (status IN ('available', 'on_loan', 'on_hold', 'retired')),
+    CHECK (status IN ('available', 'on_loan', 'on_hold', 'damaged', 'lost', 'retired')),
     FOREIGN KEY(book_id) REFERENCES Books(book_id))",
 
 /* ---------- Circulation ---------- */
@@ -214,6 +214,7 @@ $tables = [
     pick_date datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
     review_blurb text NULL,
     PRIMARY KEY(pick_id),
+    UNIQUE(book_id),
     FOREIGN KEY(user_id) REFERENCES Users(user_id),
     FOREIGN KEY(book_id) REFERENCES Books(book_id))",
 ];
@@ -242,6 +243,7 @@ $people = [
   [1, 'John', 'Doe', 'johndoe@example.com', '123-456-7890', '123 Main St', '', 'Anytown', 'CA', '12345', 'johndoe', 'SCSU2024'],
   [2, 'Jane', 'Smith', 'janesmith@example.com', '987-654-3210', '456 Elm St', 'Apt 2', 'Othertown', 'NY', '54321', 'janesmith', 'SCSU2025'],
   [3, 'Charlie', 'Brown', 'charliebrown@example.com', '555-555-5555', '789 Oak St', '', 'Sometown', 'TX', '67890', 'charliebrown', 'SCSU2026'],
+  [2, 'Mike', 'Jones', 'mikejones@example.com', '203-555-0142', '12 Crescent St', '', 'New Haven', 'CT', '06515', 'mikejones', 'SCSU2027'],
 ];
 $insert_contact = $db_connection->prepare("INSERT INTO Contacts
     (first_name, last_name, email, phone, street_1, street_2, city, state_code, post_code) VALUES (?,?,?,?,?,?,?,?,?)");
@@ -335,18 +337,32 @@ $db_connection->query("INSERT INTO Copies (book_id, barcode, status) VALUES
     (9, 'LMS-0015', 'available'), (9, 'LMS-0016', 'available'),
     (10, 'LMS-0017', 'available')");
 
-/* Jane (user 2) has The Hobbit checked out, due in 21 days */
-$db_connection->query("INSERT INTO Loans (copy_id, user_id, checkout_date, due_date) VALUES
-    (11, 2, NOW(), DATE_ADD(NOW(), INTERVAL 21 DAY))");
+/* Loans, set up so every part of the app has something to show:
+   - Jane (user 2) has The Hobbit out (its only copy), due in 21 days
+   - Jane returned Pride and Prejudice on time and rated it
+   - Jane returned Dune 6 days late and still owes $1.50
+   - Mike (user 4) has The Great Gatsby out and it's 5 days overdue
+   - Mike is waiting on The Hobbit, so when Jane returns it the copy is set aside for him */
+$db_connection->query("INSERT INTO Loans (copy_id, user_id, checkout_date, due_date, return_date, fine) VALUES
+    (11, 2, NOW(), DATE_ADD(NOW(), INTERVAL 21 DAY), NULL, 0.00),
+    (5, 2, DATE_SUB(NOW(), INTERVAL 40 DAY), DATE_SUB(NOW(), INTERVAL 19 DAY), DATE_SUB(NOW(), INTERVAL 20 DAY), 0.00),
+    (15, 2, DATE_SUB(NOW(), INTERVAL 37 DAY), DATE_SUB(NOW(), INTERVAL 16 DAY), DATE_SUB(NOW(), INTERVAL 10 DAY), 1.50),
+    (7, 4, DATE_SUB(NOW(), INTERVAL 26 DAY), DATE_SUB(NOW(), INTERVAL 5 DAY), NULL, 0.00)");
+$db_connection->query("UPDATE Copies SET status = 'on_loan' WHERE copy_id IN (7, 11)");
 
-$db_connection->query("INSERT INTO Ratings (user_id, book_id, rating) VALUES (2, 3, 5)");
+$db_connection->query("INSERT INTO Holds (book_id, user_id, status, hold_date) VALUES
+    (6, 4, 'waiting', DATE_SUB(NOW(), INTERVAL 2 DAY))");
 
-/* John (admin, user 1) picked a book */
+$db_connection->query("INSERT INTO Ratings (user_id, book_id, rating) VALUES (2, 3, 5), (2, 9, 4)");
+
+/* Staff picks chosen by John (admin, user 1) */
 $db_connection->query("INSERT INTO Staff_Picks (user_id, book_id, review_blurb) VALUES
-    (1, 1, 'A classic everyone should read at least once.')");
+    (1, 1, 'A classic everyone should read at least once.'),
+    (1, 9, 'The sci-fi epic that started it all. Clear your weekend.'),
+    (1, 10, 'Christie at her best. You will not guess the ending.')");
 
 status("Sample data added.");
-status("Done. Test logins: johndoe / SCSU2024 (admin), janesmith / SCSU2025 (user), charliebrown / SCSU2026 (guest).");
+status("Done. Test logins: johndoe / SCSU2024 (admin), janesmith / SCSU2025 and mikejones / SCSU2027 (members), charliebrown / SCSU2026 (guest).");
 echo '<a href="../index.php">Go to the login page</a>';
 
 /* ALWAYS CLOSE THE DB CONNECTION */
